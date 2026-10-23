@@ -1,0 +1,143 @@
+.profile .arco-descriptions {
+	background: var(--dew-bg);
+	padding: 18px !important;
+	border-radius: 16px;
+	margin-bottom: 20px;
+}
+.profile .arco-collapse {
+	border: 0;
+	background: var(--dew-bg);
+	border-radius: 16px;
+}
+.profile .arco-collapse-item {
+	margin: 8px 0;
+	border: 0;
+	border-radius: 14px;
+	overflow: hidden;
+}
+.profile .arco-collapse-item-header {
+	padding: 18px;
+	background: var(--dew-bg);
+}
+.profile .arco-descriptions-item-label {
+	color: var(--dew-muted);
+	font-size: 11px;
+}
+.profile .arco-descriptions-item-value {
+	color: var(--dew-text);
+	font-size: 12px;
+}
+.profile-section-label {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	color: var(--dew-text);
+	font-size: 13px;
+	margin: 16px 0;
+}
+.setup-modal .arco-modal-body {
+	background: var(--dew-bg);
+}
+.setup-modal .arco-steps {
+	padding: 16px;
+	border-radius: 18px;
+	background: var(--dew-surface);
+}
+.setup-modal .arco-step-description {
+	font-size: 11px;
+	line-height: 1.8;
+}
+.setup-intro {
+	display: flex;
+	gap: 16px;
+	align-items: center;
+	padding: 8px 0 24px;
+}
+.setup-intro > span {
+	width: 48px;
+	height: 48px;
+	display: grid;
+	place-items: center;
+	background: var(--dew-yellow);
+	border-radius: 16px;
+	color: var(--dew-olive);
+	font-size: 28px;
+}
+.setup-intro h3 {
+	margin: 0 0 6px;
+	font-size: 17px;
+	font-weight: 500;
+}
+.setup-intro p {
+	margin: 0;
+	font-size: 11px;
+	color: var(--dew-muted);
+}
+.embedded-browser-page .browser-toolbar {
+	padding: 12px 18px;
+	gap: 12px;
+	border: 0;
+	background: var(--dew-surface);
+	margin: 0 16px 14px;
+	border-radius: 16px;
+}
+.embedded-browser-page .browser-address {
+	border-radius: 20px !important;
+	background: var(--dew-bg);
+}
+.embedded-browser-page .browser-webview {
+	border-radius: 16px;
+	overflow: hidden;
+	margin: 0 16px 16px;
+	width: calc(100% - 32px);
+}
+.embedded-workspace .session-tabs {
+	border: 0;
+	background: var(--dew-bg);
+	padding: 8px 16px 12px;
+	gap: 8px;
+}
+.embedded-workspace .session-tab {
+	border-radius: 20px;
+	background: var(--dew-surface);
+}
+.embedded-workspace .session-tab.selected {
+	color: var(--dew-text);
+	background: var(--dew-yellow);
+	box-shadow: none;
+}
+.monitor-controls {
+	padding: 20px;
+	background: var(--dew-surface);
+	border-radius: 18px;
+	margin-bottom: 20px;
+	overflow-x: auto;
+}
+.monitor-empty {
+	background: var(--dew-surface);
+	border-radius: 20px;
+}
+.simple-mode-container .tabs {
+	padding: 22px !important;
+}
+.simple-mode-container .container-md {
+	max-width: 1200px !important;
+}
+.simple-mode-container .browser-card {
+	border: 1px solid var(--dew-border);
+	border-radius: 20px;
+	background: var(--dew-surface);
+}
+.simple-mode-container .cards-grid {
+	max-width: none;
+	grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+}
+.simple-mode-container .browser-card:hover {
+	border-color: var(--dew-olive);
+}
+.simple-mode-container .arco-card-header {
+	border: 0;
+}
+.simple-mode-container .arco-card-body {
+	padding: 22px;
+}

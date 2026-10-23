@@ -1,0 +1,11 @@
+node_modules
+dist
+lib
+package-lock.json
+pnpm-lock.yaml
+public
+stats.html
+tests/*
+packages/ocsjs/**
+.md
+.chrome-temp/*

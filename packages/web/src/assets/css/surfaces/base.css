@@ -1,0 +1,179 @@
+/* Shared secondary screens: actual content layouts, not just a palette override. */
+.app-brand-symbol {
+	display: inline-block;
+	color: var(--dew-olive);
+	font-size: 20px;
+	margin-right: 10px;
+	line-height: 1;
+}
+.markdown:empty {
+	display: none;
+}
+.bookmark-filters {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 16px;
+	margin-bottom: 24px;
+}
+.bookmark-filters .view-switch {
+	flex-wrap: wrap;
+}
+.bookmarks-container .bookmark-group {
+	animation: content-rise 450ms var(--motion-ease) backwards;
+}
+.bookmarks-container .bookmark-item {
+	transition: transform 220ms var(--motion-ease), background-color 200ms ease, border-color 200ms ease;
+}
+.bookmarks-container .bookmark-item:hover {
+	transform: translateY(-3px);
+	border-color: var(--dew-olive);
+}
+.bookmarks-container .page-title {
+	font-size: 28px;
+	font-weight: 500;
+}
+.bookmarks-container .page-header {
+	margin-top: 10px;
+}
+.script-local-filters {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin-bottom: 24px;
+}
+.settings-nav button {
+	white-space: nowrap;
+}
+.settings-nav button > .d-inline-flex {
+	flex-shrink: 0;
+}
+.simple-page-intro {
+	padding: 22px 30px 0;
+	text-align: center;
+}
+.simple-page-intro h1 {
+	font-size: 28px;
+	font-weight: 500;
+	margin: 8px 0;
+	color: var(--dew-text);
+}
+.simple-page-intro p {
+	font-size: 12px;
+	color: var(--dew-muted);
+}
+.provider-add {
+	min-height: 210px;
+	padding: 24px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+	border: 1px dashed #bac2a9;
+	border-radius: 18px;
+	color: var(--dew-olive);
+	background: transparent;
+	cursor: pointer;
+	font: inherit;
+	transition: background 200ms ease, border-color 200ms ease;
+}
+.provider-add:hover {
+	background: rgb(var(--primary-1));
+	border-color: var(--dew-olive);
+}
+.provider-add small {
+	font-size: 10px;
+	color: var(--dew-muted);
+}
+.section-toolbar {
+	display: flex;
+	gap: 14px;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 22px;
+	flex-wrap: wrap;
+}
+.section-toolbar-copy h3 {
+	margin: 0 0 5px;
+	font-size: 15px;
+	font-weight: 550;
+}
+.section-toolbar-copy p {
+	margin: 0;
+	color: var(--dew-muted);
+	font-size: 11px;
+}
+.metric-strip {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 12px;
+	margin-bottom: 22px;
+}
+.metric-tile {
+	padding: 18px 22px;
+	background: var(--dew-surface);
+	border: 1px solid var(--dew-border);
+	border-radius: 16px;
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+.metric-tile > span {
+	width: 36px;
+	height: 36px;
+	display: grid;
+	place-items: center;
+	background: var(--dew-bg);
+	color: var(--dew-olive);
+	border-radius: 12px;
+}
+.metric-tile strong {
+	display: block;
+	font-size: 26px;
+	font-weight: 450;
+	line-height: 1.2;
+}
+.metric-tile small {
+	display: block;
+	color: var(--dew-muted);
+	font-size: 10px;
+	margin-top: 4px;
+}
+.metric-tile.accent {
+	background: #899665;
+	border-color: transparent;
+	color: #fff;
+}
+.metric-tile.accent small {
+	color: #ffffffb0;
+}
+.metric-tile.accent > span {
+	background: #ffffff20;
+	color: #fff;
+}
+.view-switch {
+	display: flex;
+	align-items: center;
+	padding: 4px;
+	gap: 4px;
+	background: var(--dew-bg);
+	border-radius: 20px;
+}
+.view-switch button {
+	border: 0;
+	padding: 7px 13px;
+	border-radius: 16px;
+	font: inherit;
+	font-size: 11px;
+	background: transparent;
+	color: var(--dew-muted);
+	cursor: pointer;
+}
+.view-switch button.active {
+	background: var(--dew-surface);
+	color: var(--dew-text);
+	box-shadow: 0 2px 8px #26301b08;
+}

@@ -1,0 +1,137 @@
+/* Injected after the vendor stylesheet inside the course config's closed Shadow DOM. */
+:host {
+	display: block;
+	color: var(--dew-text, #242820);
+	font-family: 'Segoe UI', 'Microsoft YaHei UI', sans-serif;
+}
+script-panel-element {
+	box-shadow: none;
+	resize: none;
+	color: var(--dew-text, #242820);
+	background: var(--dew-surface, #fff);
+	border: 0;
+	border-radius: 14px;
+}
+details {
+	margin: 0 0 12px;
+	border-radius: 16px;
+	border: 1px solid var(--dew-border, #e9ebe4);
+	background: var(--dew-bg, #f0f1ee);
+	overflow: hidden;
+	transition: border-color 200ms ease, background-color 200ms ease;
+}
+details:hover {
+	border-color: var(--dew-olive, #87945c);
+}
+details[open] {
+	border-color: var(--dew-olive, #87945c);
+	background: var(--dew-surface, #fff);
+}
+summary {
+	padding: 17px 20px;
+	font-weight: 550;
+	font-size: 13px;
+	color: var(--dew-text, #242820);
+	cursor: pointer;
+	list-style: none;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	user-select: none;
+	outline: none;
+	background: transparent;
+	transition: background-color 180ms ease;
+}
+summary::-webkit-details-marker {
+	display: none;
+}
+summary::after {
+	content: '';
+	width: 6px;
+	height: 6px;
+	border-right: 1.5px solid var(--dew-muted, #93978d);
+	border-bottom: 1.5px solid var(--dew-muted, #93978d);
+	transform: rotate(-45deg);
+	transition: transform 250ms cubic-bezier(0.22, 1, 0.36, 1);
+	flex-shrink: 0;
+	margin-left: 10px;
+}
+details[open] > summary::after {
+	transform: rotate(45deg);
+	border-color: var(--dew-olive, #87945c);
+}
+details[open] > summary,
+summary:hover {
+	color: var(--dew-olive, #87945c);
+	background: rgb(var(--primary-1, 243, 245, 235));
+}
+summary:focus-visible {
+	outline: 2px solid var(--dew-olive, #87945c);
+	outline-offset: -3px;
+}
+details[open] > script-panel-element {
+	animation: config-reveal 240ms ease-out;
+}
+input,
+textarea,
+select,
+.base-style-input {
+	border-radius: 9px;
+	border-color: var(--dew-border, #e9ebe4);
+	background: var(--dew-bg, #f0f1ee);
+	color: var(--dew-text, #242820);
+	font: inherit;
+	font-size: 12px;
+	transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+input:focus,
+textarea:focus,
+select:focus {
+	outline: none;
+	border-color: var(--dew-olive, #87945c);
+	box-shadow: 0 0 0 3px rgb(var(--primary-2, 229, 234, 214), 0.45);
+}
+input[type='checkbox'],
+input[type='radio'] {
+	accent-color: var(--dew-olive, #87945c);
+}
+button,
+.base-style-button {
+	border-radius: 20px;
+	border-color: var(--dew-olive, #87945c);
+	color: var(--dew-olive, #87945c);
+	background: var(--dew-surface, #fff);
+	padding: 7px 13px;
+	transition: transform 160ms ease, background-color 160ms ease;
+}
+button:hover,
+.base-style-button:hover {
+	background: rgb(var(--primary-1, 243, 245, 235));
+}
+button:active {
+	transform: scale(0.97);
+}
+a {
+	color: var(--dew-olive, #87945c);
+}
+hr {
+	border-color: var(--dew-border, #e9ebe4);
+}
+@keyframes config-reveal {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation: none !important;
+		transition: none !important;
+	}
+}

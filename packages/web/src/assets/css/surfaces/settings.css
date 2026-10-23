@@ -1,0 +1,100 @@
+.settings-layout {
+	display: grid;
+	grid-template-columns: 220px minmax(0, 1fr);
+	gap: 24px;
+	align-items: start;
+}
+.settings-nav {
+	position: sticky;
+	top: 12px;
+	border-radius: 20px;
+	padding: 16px;
+	background: var(--dew-surface);
+}
+.settings-nav-title {
+	color: var(--dew-muted);
+	font-size: 9px;
+	letter-spacing: 1.5px;
+	padding: 10px 12px 18px;
+}
+.settings-nav button {
+	border: 0;
+	border-radius: 12px;
+	width: 100%;
+	background: transparent;
+	color: var(--dew-muted);
+	font: inherit;
+	padding: 14px 12px;
+	text-align: left;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	cursor: pointer;
+	font-size: 12px;
+	margin-bottom: 4px;
+}
+.settings-nav button.active {
+	color: var(--dew-text);
+	background: var(--dew-bg);
+}
+.settings-nav button:hover {
+	background: var(--dew-bg);
+}
+.settings-nav button.active .material-icons-outlined {
+	color: var(--dew-olive);
+}
+.settings-nav-footnote {
+	border-top: 1px solid var(--dew-border);
+	padding: 20px 12px 8px;
+	margin-top: 18px;
+	font-size: 10px;
+	line-height: 1.9;
+	color: var(--dew-muted);
+}
+.settings-content {
+	min-width: 0;
+}
+.settings-content .arco-card {
+	border: 0;
+	padding: 10px;
+	margin-bottom: 18px;
+}
+.settings-content .arco-card-header {
+	border-bottom-color: var(--dew-border);
+	height: 70px;
+}
+.settings-content .arco-card-header-title {
+	font-size: 15px;
+	font-weight: 550;
+}
+.settings-section-summary {
+	color: var(--dew-muted);
+	font-size: 11px;
+	line-height: 1.9;
+	margin-bottom: 24px;
+}
+.settings-content .desc-label {
+	color: var(--dew-text);
+	font-size: 12px;
+}
+.settings-content .row {
+	padding: 16px 0;
+	border-bottom: 1px solid var(--dew-border);
+}
+.settings-content .row:last-child {
+	border-bottom: 0;
+}
+.settings-danger {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 20px;
+	padding: 24px;
+	background: var(--dew-surface);
+	border-radius: 18px;
+}
+.settings-danger p {
+	margin: 5px 0 0;
+	color: var(--dew-muted);
+	font-size: 11px;
+}

@@ -1,0 +1,197 @@
+.space-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+	gap: 18px;
+	padding: 4px 0 20px;
+}
+.space-card {
+	padding: 22px;
+	border: 1px solid transparent;
+	border-radius: 20px;
+	background: var(--dew-surface);
+	min-width: 0;
+}
+.space-card.is-selected {
+	border-color: var(--dew-olive);
+	background: rgb(var(--primary-1));
+}
+.space-card-top {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 22px;
+}
+.space-card-top .arco-checkbox {
+	margin-left: auto;
+}
+.space-emblem {
+	width: 44px;
+	height: 44px;
+	display: grid;
+	place-items: center;
+	background: var(--dew-bg);
+	color: var(--dew-olive);
+	border-radius: 15px;
+}
+.space-status {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	color: var(--dew-muted);
+	font-size: 10px;
+}
+.space-status i {
+	width: 5px;
+	height: 5px;
+	background: #c2c6b9;
+	border-radius: 50%;
+}
+.space-status.running i {
+	background: var(--dew-olive);
+	box-shadow: 0 0 0 3px rgb(var(--primary-2), 0.6);
+}
+.space-name {
+	padding: 0;
+	background: transparent;
+	border: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	width: 100%;
+	font-size: 17px;
+	color: var(--dew-text);
+	cursor: pointer;
+	font-weight: 550;
+	text-align: left;
+}
+.space-name > span {
+	font-size: 16px;
+	color: var(--dew-muted);
+}
+.space-notes {
+	font-size: 11px;
+	color: var(--dew-muted);
+	line-height: 1.9;
+	min-height: 42px;
+	margin: 10px 0 16px;
+	overflow-wrap: anywhere;
+}
+.space-tags {
+	display: flex;
+	gap: 5px;
+	align-items: center;
+	flex-wrap: wrap;
+	min-height: 26px;
+}
+.space-script-count {
+	color: var(--dew-muted);
+	font-size: 9px;
+	margin-left: auto;
+}
+.space-actions {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	border-top: 1px solid var(--dew-border);
+	padding-top: 16px;
+	margin-top: 18px;
+	gap: 8px;
+}
+.space-actions .browser-operators {
+	flex-wrap: wrap;
+}
+.space-actions .material-icons-outlined {
+	color: inherit !important;
+}
+.space-actions .arco-btn-primary {
+	background: var(--dew-text);
+	color: var(--dew-surface);
+}
+.folder-tile {
+	background: var(--dew-surface);
+	border: 1px solid var(--dew-border);
+	padding: 18px 22px;
+	border-radius: 16px;
+	display: flex;
+	align-items: center;
+	gap: 14px;
+}
+.folder-tile > button {
+	flex: 1;
+	display: flex;
+	gap: 12px;
+	align-items: center;
+	background: transparent;
+	color: var(--dew-text);
+	border: 0;
+	cursor: pointer;
+	font: inherit;
+	font-size: 13px;
+	text-align: left;
+}
+.folder-tile .material-icons-outlined {
+	color: var(--dew-olive);
+}
+.polished-empty {
+	padding: 70px 24px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	border-radius: 22px;
+	background: var(--dew-surface);
+}
+.empty-symbol {
+	width: 76px;
+	height: 76px;
+	display: grid;
+	place-items: center;
+	color: var(--dew-olive);
+	background: radial-gradient(circle, var(--dew-yellow), transparent 72%);
+	margin-bottom: 14px;
+}
+.polished-empty h3 {
+	margin: 8px 0 10px;
+	color: var(--dew-text);
+	font-size: 21px;
+	font-weight: 450;
+}
+.polished-empty p {
+	color: var(--dew-muted);
+	font-size: 12px;
+	line-height: 1.9;
+	max-width: 380px;
+}
+.polished-empty .dew-button {
+	margin-top: 16px;
+}
+.script-manager .user-script {
+	margin-top: 12px;
+	padding: 22px;
+	background: var(--dew-surface);
+	border: 1px solid var(--dew-border);
+	border-radius: 18px;
+	box-shadow: none;
+	transition: transform 220ms var(--motion-ease), border-color 220ms ease, box-shadow 220ms ease;
+}
+.script-manager .user-script:hover {
+	border-color: #a9b68a;
+	transform: translateY(-2px);
+	box-shadow: 0 8px 24px #25331b08;
+}
+.script-manager .user-script-name {
+	font-size: 15px;
+	letter-spacing: 0;
+}
+.script-manager .user-script-descriptions {
+	color: var(--dew-muted);
+	padding: 12px 0;
+}
+.script-manager .user-script-action {
+	background: var(--dew-bg) !important;
+	border-color: var(--dew-border);
+}
+.script-manager .arco-tag {
+	border-radius: 20px;
+	font-size: 10px;
+}

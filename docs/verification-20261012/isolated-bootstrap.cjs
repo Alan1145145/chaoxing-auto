@@ -1,0 +1,1 @@
+const {app}=require('electron'); app.setPath('userData', require('path').join(__dirname, 'test-profile')); require(require('path').join(__dirname, '..', '..', 'packages', 'app', 'lib', 'index.js'));

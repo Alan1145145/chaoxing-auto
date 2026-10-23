@@ -1,0 +1,13 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.resolveCompletion = exports.isJudgementOptions = exports.resolveJudgement = exports.disambiguateSimilarOptions = exports.resolveMultiple = exports.resolveSingle = void 0;
+var single_1 = require("./single");
+Object.defineProperty(exports, "resolveSingle", { enumerable: true, get: function () { return single_1.resolveSingle; } });
+var multiple_1 = require("./multiple");
+Object.defineProperty(exports, "resolveMultiple", { enumerable: true, get: function () { return multiple_1.resolveMultiple; } });
+Object.defineProperty(exports, "disambiguateSimilarOptions", { enumerable: true, get: function () { return multiple_1.disambiguateSimilarOptions; } });
+var judgement_1 = require("./judgement");
+Object.defineProperty(exports, "resolveJudgement", { enumerable: true, get: function () { return judgement_1.resolveJudgement; } });
+Object.defineProperty(exports, "isJudgementOptions", { enumerable: true, get: function () { return judgement_1.isJudgementOptions; } });
+var completion_1 = require("./completion");
+Object.defineProperty(exports, "resolveCompletion", { enumerable: true, get: function () { return completion_1.resolveCompletion; } });

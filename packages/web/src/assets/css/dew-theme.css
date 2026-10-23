@@ -1,0 +1,308 @@
+/* Shared Dew design tokens, after Arco and the existing theme. */
+body {
+	--dew-bg: #f0f1ee;
+	--dew-surface: #fff;
+	--dew-text: #242820;
+	--dew-muted: #93978d;
+	--dew-border: #e9ebe4;
+	--dew-olive: #87945c;
+	--dew-yellow: #f0efc9;
+	--primary-1: 243, 245, 235;
+	--primary-2: 229, 234, 214;
+	--primary-3: 207, 216, 182;
+	--primary-4: 175, 187, 143;
+	--primary-5: 151, 166, 111;
+	--primary-6: 119, 136, 78;
+	--primary-7: 99, 115, 62;
+	--primary-8: 80, 94, 47;
+	--color-bg-1: var(--dew-bg);
+	--color-bg-2: var(--dew-surface);
+	--color-text-1: var(--dew-text);
+	--color-text-2: #686e61;
+	--color-text-3: var(--dew-muted);
+	--color-border-2: var(--dew-border);
+	--border-radius-small: 10px;
+	--border-radius-medium: 16px;
+	--border-radius-large: 20px;
+	background: var(--dew-bg);
+	color: var(--dew-text);
+}
+body[arco-theme='dark'] {
+	--color-bg-1: var(--dew-bg);
+	--color-bg-2: var(--dew-surface);
+	--color-text-1: var(--dew-text);
+	--color-text-2: #bec6b1;
+	--color-text-3: var(--dew-muted);
+	--color-border-2: var(--dew-border);
+	--color-fill-1: #242b20;
+	--color-fill-2: #363e2e;
+	--dew-bg: #20231e;
+	--dew-surface: #2b3027;
+	--dew-text: #e4e8da;
+	--dew-muted: #a0a792;
+	--dew-border: #3a4132;
+	--dew-yellow: #505337;
+	--dew-olive: #b0bf83;
+	--color-text-2: #bec6b1;
+	--primary-1: 51, 62, 37;
+	--primary-6: 160, 183, 110;
+}
+#app {
+	font-family: 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', sans-serif;
+}
+.main-container {
+	background: var(--dew-bg);
+}
+.workspace-main {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+}
+.workspace-main > .embedded-workspace {
+	flex: 1;
+	height: 0;
+	min-height: 0;
+}
+.workspace-route > div > .overflow-auto {
+	padding: 0 24px 24px;
+	box-sizing: border-box;
+}
+#title {
+	background: var(--dew-bg) !important;
+	border-bottom: 1px solid var(--dew-border) !important;
+	color: var(--dew-muted) !important;
+}
+#title .brand-title {
+	font-weight: 500 !important;
+	font-size: 11px !important;
+	color: var(--dew-muted) !important;
+}
+.dew-page {
+	padding: 12px 30px 30px;
+	max-width: 1800px;
+	margin: auto;
+}
+.dew-heading {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	margin: 0 0 24px;
+}
+.browsers-page > .dew-heading {
+	flex-shrink: 0;
+}
+.dew-eyebrow {
+	text-transform: uppercase;
+	color: var(--dew-muted);
+	letter-spacing: 2px;
+	font-size: 9px;
+	margin-bottom: 8px;
+}
+.dew-heading h1 {
+	color: var(--dew-text);
+	font-size: 28px;
+	font-weight: 550;
+	letter-spacing: -1px;
+	margin: 0;
+}
+.dew-heading p {
+	font-size: 12px;
+	color: var(--dew-muted);
+	margin: 8px 0 0;
+}
+.dew-card {
+	background: var(--dew-surface);
+	border-radius: 18px;
+	padding: 22px;
+	min-width: 0;
+}
+.dew-card-title {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 13px;
+	font-weight: 550;
+	margin-bottom: 20px;
+}
+.dew-card-title small {
+	color: var(--dew-muted);
+	font-weight: 400;
+	font-size: 10px;
+}
+.dew-muted {
+	color: var(--dew-muted);
+}
+.dew-pill {
+	padding: 5px 10px;
+	border-radius: 20px;
+	font-size: 10px;
+	background: var(--dew-bg);
+	color: var(--dew-muted);
+}
+.dew-pill.ready {
+	color: #657640;
+	background: #eef1e5;
+}
+.dew-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	background: var(--dew-text);
+	color: var(--dew-surface);
+	border: 0;
+	border-radius: 24px;
+	padding: 11px 20px;
+	cursor: pointer;
+	font: inherit;
+	font-size: 12px;
+	transition: opacity 0.18s;
+}
+.dew-button:hover {
+	opacity: 0.8;
+}
+.dew-button:disabled {
+	opacity: 0.4;
+	cursor: not-allowed;
+}
+.dew-button.secondary {
+	background: var(--dew-surface);
+	color: var(--dew-text);
+	border: 1px solid var(--dew-border);
+}
+.dew-link {
+	border: 0;
+	padding: 0;
+	color: var(--dew-olive);
+	background: transparent;
+	font: inherit;
+	font-size: 11px;
+	cursor: pointer;
+}
+.arco-btn {
+	font-weight: 500;
+}
+.arco-btn-size-medium {
+	border-radius: 22px;
+}
+.arco-card,
+.arco-modal,
+.arco-drawer {
+	border-color: var(--dew-border) !important;
+}
+.arco-card {
+	border-radius: 18px !important;
+	box-shadow: none !important;
+}
+.arco-table-container,
+.arco-table-content {
+	border-radius: 12px;
+}
+.arco-table-th {
+	background: var(--dew-bg) !important;
+}
+.arco-table-td {
+	border-color: var(--dew-border) !important;
+}
+.arco-tabs-nav-type-rounded .arco-tabs-tab-active {
+	background: var(--dew-text) !important;
+	color: var(--dew-surface) !important;
+}
+.question-bank .content-section {
+	border: 0 !important;
+	border-radius: 18px !important;
+	padding: 24px !important;
+	background: var(--dew-surface);
+}
+.question-bank .page-header h2 {
+	font-size: 28px;
+	font-weight: 550;
+	letter-spacing: -1px;
+}
+.browsers-page .operations-card {
+	margin-bottom: 20px;
+}
+.browsers-page .stats-bar {
+	color: var(--dew-muted);
+}
+.simple-mode-container {
+	background: var(--dew-bg) !important;
+}
+.setting-panel {
+	background: var(--dew-surface);
+	border-radius: 18px;
+}
+#browsers .entities .entity {
+	background: var(--dew-surface);
+	padding: 14px 18px;
+	border: 1px solid transparent;
+	border-radius: 14px;
+	margin: 0 0 8px;
+}
+#browsers .entities .entity:hover {
+	border-color: var(--dew-border);
+}
+#browsers .entities .entity.active,
+#browsers .entities .entity.is-context {
+	background: rgb(var(--primary-1));
+	border-color: var(--dew-olive);
+}
+#browsers .entity-name {
+	color: var(--dew-text) !important;
+	font-size: 13px;
+}
+.bookmarks-container .bg-mesh {
+	background: radial-gradient(ellipse at 50% 10%, #eff0cf80, transparent 60%) !important;
+}
+.bookmarks-container .bg-noise {
+	display: none;
+}
+.bookmarks-container .title-gradient {
+	background: none !important;
+	-webkit-text-fill-color: var(--dew-text) !important;
+}
+.bookmarks-container .browser-info-card,
+.bookmarks-container .bookmark-group {
+	box-shadow: none;
+	border-radius: 18px;
+}
+.bookmarks-container .tip-card,
+.bookmarks-container .status-card {
+	background: rgb(var(--primary-1)) !important;
+	border-color: var(--dew-border) !important;
+}
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background: #c8cdbf;
+	border: 1px solid var(--dew-bg);
+}
+::-webkit-scrollbar-button {
+	display: none !important;
+}
+button:focus-visible {
+	outline: 2px solid var(--dew-olive);
+	outline-offset: 3px;
+}
+@media (max-width: 1050px) {
+	.dew-page {
+		padding: 12px 20px 24px;
+	}
+}
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		transition-duration: 0.01ms !important;
+	}
+}
