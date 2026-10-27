@@ -14,6 +14,10 @@ app
 	.then(async () => {
 		const axios = appRequire('axios');
 		axios.interceptors.request.use((config) => {
+			const target = new URL(config.url);
+			if (['localhost', '127.0.0.1'].includes(target.hostname) && target.port === '15319') {
+				target.port = '15329'; config.url = target.href;
+			}
 			if (!['localhost', '127.0.0.1'].includes(new URL(config.url).hostname)) {
 				throw new Error('Upstream requests disabled in model integration test');
 			}
@@ -26,7 +30,8 @@ app
 		const { remoteRegister } = load('src/tasks/remote.register');
 		const embedded = load('src/utils/embedded-browser');
 		initStore();
-		await startupServer();
+		
+		await startupServer(15329);
 		const win = createWindow();
 		remoteRegister(win);
 		await win.loadFile(path.join(appRoot, 'public/index.html'));
@@ -46,7 +51,7 @@ app
 				await embedded.prepareEmbeddedBrowser(uid);
 				const fixtureSession = session.fromPartition(`persist:ocs-${uid}`);
 				fixtureSession.protocol.handle('https', (request) => {
-					if (new URL(request.url).hostname !== 'study.chaoxing.com') return new Response('', { status: 404 });
+					if (!['study.chaoxing.com', 'mooc.chaoxing.com'].includes(new URL(request.url).hostname)) return new Response('', { status: 404 });
 					const frame = request.url.includes('fixture-frame');
 					return new Response(
 						`<!doctype html><html><head><title>Local sync fixture</title></head><body>

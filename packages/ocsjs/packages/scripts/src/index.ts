@@ -1,3 +1,4 @@
+import './utils/safe-window-drag';
 import { Project } from 'easy-us';
 import { CommonProject } from './projects/common';
 import { ZHSProject } from './projects/zhs';

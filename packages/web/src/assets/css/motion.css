@@ -119,6 +119,19 @@
 	overflow: hidden;
 	box-shadow: 0 24px 90px #20251c22;
 }
+.model-provider-modal {
+	max-width: calc(100vw - 32px);
+	max-height: calc(100vh - 48px);
+	display: flex;
+	flex-direction: column;
+}
+.model-provider-modal .arco-modal-body {
+	min-height: 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+.model-provider-modal .arco-modal-header,
+.model-provider-modal .arco-modal-footer { flex-shrink: 0; }
 .arco-modal-header {
 	padding: 22px 26px;
 	height: auto;

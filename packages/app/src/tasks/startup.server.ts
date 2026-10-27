@@ -129,11 +129,11 @@ async function fetchIcon(iconUrl: string): Promise<{ data: Buffer; contentType: 
 	return FALLBACK_ICON;
 }
 
-export async function startupServer() {
+export async function startupServer(port = 15319) {
 	const app = express();
 
 	store.set('server', {
-		port: 15319,
+		port,
 		authToken: randomUUID().replace(/-/g, '')
 	});
 

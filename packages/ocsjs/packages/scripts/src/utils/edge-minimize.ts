@@ -17,6 +17,13 @@ const SNAP_ANIM_CLASS = 'edge-snapping';
 let snapping = false;
 /** 头部拖动进行中（用于拖放高亮区域显示） */
 let headerDragging = false;
+let edgeUpdateFrame = 0;
+function scheduleEdgeUpdate() {
+	if (!edgeUpdateFrame) edgeUpdateFrame = requestAnimationFrame(() => {
+		edgeUpdateFrame = 0;
+		updateEdgeMode();
+	});
+}
 /** 拖放高亮区域元素 */
 let dropZone: HTMLElement | undefined;
 
@@ -129,16 +136,21 @@ function ensurePanelInViewport(container: HTMLElement) {
  */
 function enableIconDraggable(icon: HTMLElement, container: HTMLElement) {
 	icon.addEventListener('pointerdown', (e) => {
+		if (!e.isPrimary || e.button !== 0) return;
 		e.preventDefault();
 		e.stopPropagation();
+		try { icon.setPointerCapture(e.pointerId); } catch { return; }
 		const startX = e.clientX;
 		const startY = e.clientY;
 		const startTop = container.offsetTop;
 		const side: 'left' | 'right' = container.classList.contains('edge-right') ? 'right' : 'left';
 		let dragging = false;
 		let exited = false;
+		let ended = false;
 
 		const onMove = (ev: PointerEvent) => {
+			if (ev.pointerId !== e.pointerId) return;
+			if (ev.pointerType === 'mouse' && (ev.buttons & 1) === 0) { finish(true); return; }
 			if (!dragging && Math.hypot(ev.clientX - startX, ev.clientY - startY) > 6) {
 				dragging = true;
 			}
@@ -156,21 +168,34 @@ function enableIconDraggable(icon: HTMLElement, container: HTMLElement) {
 			}
 			container.style.top = Math.max(startTop + (ev.clientY - startY), 10) + 'px';
 		};
-		const onUp = () => {
-			document.removeEventListener('pointermove', onMove);
-			document.removeEventListener('pointerup', onUp);
+		const finish = (cancelled = false) => {
+			if (ended) return;
+			ended = true;
+			icon.removeEventListener('pointermove', onMove);
+			icon.removeEventListener('pointerup', onUp);
+			icon.removeEventListener('pointercancel', onCancel);
+			icon.removeEventListener('lostpointercapture', onCancel);
+			window.removeEventListener('blur', onCancel);
+			window.removeEventListener('pagehide', onCancel);
+			try { if (icon.hasPointerCapture(e.pointerId)) icon.releasePointerCapture(e.pointerId); } catch { /* Detached icon. */ }
 			if (dragging) {
 				// 持久化位置并重新判定（拖回吸附区域则重新吸附）
 				BackgroundProject.scripts.render.methods.setPosition(container.offsetLeft, container.offsetTop);
 				updateEdgeMode();
-			} else {
+			} else if (!cancelled) {
 				BackgroundProject.scripts.render.methods.normal();
 				// 展开为正常尺寸后（下一帧待样式生效），校正位置保证面板完整显示在屏幕内
 				requestAnimationFrame(() => ensurePanelInViewport(container));
 			}
 		};
-		document.addEventListener('pointermove', onMove);
-		document.addEventListener('pointerup', onUp);
+		const onUp = (ev: PointerEvent) => { if (ev.pointerId === e.pointerId) finish(); };
+		const onCancel = () => finish(true);
+		icon.addEventListener('pointermove', onMove);
+		icon.addEventListener('pointerup', onUp);
+		icon.addEventListener('pointercancel', onCancel);
+		icon.addEventListener('lostpointercapture', onCancel);
+		window.addEventListener('blur', onCancel);
+		window.addEventListener('pagehide', onCancel);
 	});
 }
 
@@ -204,10 +229,15 @@ export function initEdgeMinimize(retry = 3) {
 
 	// 拖放高亮区域：头部拖动进入吸附区域时显示，松手隐藏并直接判定一次
 	ensureDropZone();
-	container.querySelector('header-element')?.addEventListener('pointerdown', () => {
+	container.querySelector<HTMLElement>('header-element')?.addEventListener('pointerdown', (e) => {
+		if (!e.isPrimary || e.button !== 0 || e.composedPath().some((item) => item instanceof Element &&
+			item.matches('button,a,input,select,textarea,dropdown-element,.dropdown-option,.switch'))) return;
 		headerDragging = true;
 	});
 	document.addEventListener('pointermove', (e) => {
+		if (headerDragging && e.pointerType === 'mouse' && (e.buttons & 1) === 0) {
+			headerDragging = false; hideDropZone(); return;
+		}
 		if (headerDragging) updateDropZone(e.clientX);
 	});
 	document.addEventListener('pointerup', () => {
@@ -222,10 +252,11 @@ export function initEdgeMinimize(retry = 3) {
 		headerDragging = false;
 		hideDropZone();
 	});
+	window.addEventListener('blur', () => { headerDragging = false; hideDropZone(); });
 
 	// 状态/位置变化时重新判定（覆盖标题栏按钮、三击重置、moveToEdge）
-	render.onConfigChange('visual', () => updateEdgeMode());
-	render.onConfigChange('x', () => updateEdgeMode());
+	render.onConfigChange('visual', scheduleEdgeUpdate);
+	render.onConfigChange('x', scheduleEdgeUpdate);
 	// 视口缩放时右侧吸附需重新对齐
 	window.addEventListener('resize', () => updateEdgeMode());
 

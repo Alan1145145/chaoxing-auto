@@ -1,5 +1,5 @@
 // @ts-check
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, Menu, shell } from 'electron';
 import path from 'path';
 
 export function createWindow() {
@@ -44,6 +44,23 @@ export function createWindow() {
 	});
 
 	win.webContents.on('did-attach-webview', (_event, guestWebContents) => {
+		const send = (channel: string, payload: Record<string, unknown>) => {
+			if (!win.isDestroyed()) win.webContents.send(channel, { sourceId: guestWebContents.id, ...payload });
+		};
+		guestWebContents.on('before-input-event', (event, input) => {
+			if (input.type !== 'keyDown') return;
+			const key = input.key.toLowerCase();
+			if (((input.control || input.meta) && ['t', 'w', 'l', 'r'].includes(key)) || key === 'f5' || (input.alt && ['arrowleft', 'arrowright', 'home'].includes(key))) {
+				event.preventDefault();
+				send('embedded-browser-shortcut', { key, alt: input.alt });
+			}
+		});
+		guestWebContents.on('context-menu', (_event, params) => {
+			const items: Electron.MenuItemConstructorOptions[] = [];
+			if (/^https?:\/\//i.test(params.linkURL)) items.push({ label: '在新标签页打开链接', click: () => send('embedded-browser-open-tab', { url: params.linkURL }) });
+			items.push({ role: 'copy' }, { role: 'paste' }, { label: '后退', enabled: guestWebContents.canGoBack(), click: () => guestWebContents.goBack() }, { label: '前进', enabled: guestWebContents.canGoForward(), click: () => guestWebContents.goForward() }, { label: '刷新', click: () => guestWebContents.reload() });
+			Menu.buildFromTemplate(items).popup({ window: win });
+		});
 		guestWebContents.setWindowOpenHandler(({ url }) => {
 			let destination: URL;
 			try {
@@ -53,15 +70,7 @@ export function createWindow() {
 			}
 
 			if (destination.protocol === 'http:' || destination.protocol === 'https:') {
-				// Keep links opened with target="_blank" in the current embedded browser.
-				setImmediate(() => {
-					if (guestWebContents.isDestroyed()) return;
-					void guestWebContents.loadURL(destination.href).catch((error) => {
-						const failure = error as NodeJS.ErrnoException;
-						if (failure.code === 'ERR_ABORTED' || failure.errno === -3) return;
-						console.warn(`内嵌浏览器导航失败：${String(error)}`);
-					});
-				});
+				send('embedded-browser-open-tab', { url: destination.href });
 			} else if (destination.protocol === 'mailto:' || destination.protocol === 'tel:') {
 				void shell.openExternal(destination.href).catch((error) => {
 					console.warn(`打开外部链接失败：${String(error)}`);

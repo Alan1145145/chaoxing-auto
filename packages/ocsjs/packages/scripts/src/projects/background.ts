@@ -456,6 +456,7 @@ export const BackgroundProject = Project.create({
 			async onstart() {
 				let syncing = false;
 				let lastSnapshot = '';
+				let lastSource = '';
 				let panelsLocked = false;
 				// 每个课程框架都有独立的配置缓存，均需持续读取桌面配置。
 				const sync = async () => {
@@ -480,6 +481,8 @@ export const BackgroundProject = Project.create({
 							this.cfg.sync_status = 'not_open_sync';
 							return;
 						}
+						const sourceSnapshot = JSON.stringify(res);
+						if (sourceSnapshot === lastSource && this.cfg.sync_status === 'synced') return;
 
 						// 自OCS软件 2.8.21 版本后特殊字段，用于标记不进行同步的字段
 						// 通过OCS playwright 启动的浏览器会自动返回数据
@@ -595,7 +598,8 @@ export const BackgroundProject = Project.create({
 							}
 
 						panelsLocked = true;
-						this.cfg.sync_status = 'synced';
+						lastSource = sourceSnapshot;
+						if (this.cfg.sync_status !== 'synced') this.cfg.sync_status = 'synced';
 					} catch (e) {
 						console.error(e);
 						this.cfg.sync_status = 'unconnect';

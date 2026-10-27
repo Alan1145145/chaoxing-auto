@@ -26,7 +26,7 @@ const path = require('path');
 		if (req.headers.authorization === 'Bearer invalid-fixture-key') {
 			res.writeHead(401).end(JSON.stringify({ error: { message: 'invalid key invalid-fixture-key' } }));
 		} else if (req.url.endsWith('/models')) {
-			res.end(JSON.stringify({ data: [{ id: 'fixture-chat' }, { id: 'fixture-other' }] }));
+			res.end(JSON.stringify({ data: [{ id: 'fixture-chat' }, { id: 'fixture-other' }, ...Array.from({length:200}, (_,i)=>({id:'fixture-extra-'+i}))] }));
 		} else if (req.url.endsWith('/chat/completions')) {
 			res.end(JSON.stringify({ choices: [{ message: { content: '{"answer":"本地测试答案"}' } }] }));
 		} else res.writeHead(404).end('{}');
@@ -56,7 +56,7 @@ const path = require('path');
 		const probe = await application.evaluate(() =>
 			globalThis.__modelTest.course.webContents.executeJavaScript(`new Promise((resolve) => {
 			const timer = setTimeout(() => resolve({ error: 'GM timeout' }), 2000);
-			GM_xmlhttpRequest({ url: 'http://localhost:15319/ocs-global-setting', responseType: 'json',
+			GM_xmlhttpRequest({ url: 'http://localhost:15329/ocs-global-setting', responseType: 'json',
 				onload: (res) => { clearTimeout(timer); resolve({ status: res.status, text: res.responseText }); },
 				onerror: (error) => { clearTimeout(timer); resolve(error); } });
 		})`)
@@ -81,9 +81,21 @@ const path = require('path');
 		await modal.getByPlaceholder('https://api.openai.com/v1', { exact: true }).fill(base);
 		await modal.getByPlaceholder('输入 API Key', { exact: true }).fill('fixture-key-only');
 		await modal.getByRole('button', { name: '一键获取模型', exact: true }).click();
-		await modal.getByText('已获取 2 个模型，可搜索选择，也可手动输入模型 ID。').waitFor();
+		await modal.getByText('已获取 202 个模型，可搜索选择，也可手动输入模型 ID。').waitFor();
 		check(modelRequests.at(-1).url === '/proxy/v4/models', 'Custom API prefix changed');
 		check(modelRequests.at(-1).authorization === 'Bearer fixture-key-only', 'New key not used');
+		await modal.locator('.model-picker .arco-select-view').click();
+		const dropdown = page.locator('.arco-select-dropdown:visible');
+		await dropdown.waitFor();
+		await dropdown.locator('.arco-select-dropdown-list-wrapper').hover();
+		await page.mouse.wheel(0, 700);
+		await page.waitForTimeout(200);
+		await page.screenshot({path:path.join(evidence,'dropdown-debug.png')});
+		check(await dropdown.evaluate(el => [...el.querySelectorAll('*'),el].some(node=>node.scrollTop>0)), 'Long model list does not scroll');
+		await modal.locator('.model-picker input').fill('fixture-extra-199');
+		await modal.locator('.model-picker input').press('ArrowDown');
+		await modal.locator('.model-picker input').press('Enter');
+		check((await modal.locator('.model-picker .arco-select-view').innerText()).includes('fixture-extra-199'), 'Search/keyboard model choice failed');
 		await modal.getByRole('button', { name: '测试连接', exact: true }).click();
 		await page.getByText(/模型连接成功，耗时/).waitFor();
 		await page.screenshot({ path: path.join(evidence, 'model-picker.png') });
@@ -95,9 +107,17 @@ const path = require('path');
 		check(integration.provider.apiKey === '' && integration.provider.hasApiKey, 'Saved key missing or exposed');
 		check(integration.config.openSync === true, 'OCS sync not enabled by modal save');
 		check(
-			integration.config.store['common.settings.answererWrappers'][0].url === 'http://localhost:15319/query',
+			integration.config.store['common.settings.answererWrappers'][0].url === 'http://localhost:15329/query',
 			'Answerer missing from server'
 		);
+		await page.getByRole('button', { name: '思考模式：模型默认', exact: true }).click();
+		await page.waitForFunction(() => document.querySelector('.ocs-save-status')?.dataset.state === 'success');
+		check(await application.evaluate(() => globalThis.__modelTest.configState().provider.reasoningEnabled), 'Thinking toggle was not persisted');
+		await page.getByRole('button', { name: '联网搜索：关闭', exact: true }).click();
+		await page.waitForFunction(() => document.querySelector('.ocs-save-status')?.dataset.state === 'success');
+		check(await application.evaluate(() => globalThis.__modelTest.configState().provider.webSearchEnabled), 'Search toggle was not persisted');
+		await page.getByRole('button', { name: '联网搜索：开启', exact: true }).click();
+		await page.waitForFunction(() => document.querySelector('.ocs-save-status')?.dataset.state === 'success');
 		const synced = await waitForCourse(
 			(state) =>
 				state.top.wrappers.length === 1 &&
@@ -118,13 +138,13 @@ const path = require('path');
 		})`)
 		);
 		check(answer[1] === '本地测试答案', 'OCS answerer did not reach the selected model');
-		check(JSON.parse(modelRequests.at(-1).body).model === 'fixture-chat', 'Wrong upstream model used');
+		check(JSON.parse(modelRequests.at(-1).body).model === 'fixture-extra-199', 'Wrong upstream model used');
 
 		const providerCard = page.locator('.provider-card').filter({ hasText: '自动同步测试模型' });
 		await providerCard.getByTitle('配置模型', { exact: true }).click();
 		const edit = page.locator('.arco-modal:visible').filter({ hasText: '编辑模型接入' });
 		await edit.getByRole('button', { name: '一键获取模型', exact: true }).click();
-		await edit.getByText('已获取 2 个模型，可搜索选择，也可手动输入模型 ID。').waitFor();
+		await edit.getByText('已获取 202 个模型，可搜索选择，也可手动输入模型 ID。').waitFor();
 		check(modelRequests.at(-1).authorization === 'Bearer fixture-key-only', 'Saved key not reused in editor');
 		await edit.getByPlaceholder('留空以保留已保存的密钥', { exact: true }).fill('invalid-fixture-key');
 		await edit.getByRole('button', { name: '一键获取模型', exact: true }).click();
@@ -132,11 +152,8 @@ const path = require('path');
 		check(!(await edit.locator('.arco-alert').innerText()).includes('invalid-fixture-key'), 'API key leaked in error');
 		check(await edit.isVisible(), 'Fetch error closed editor');
 		await edit.getByRole('button', { name: '取消', exact: true }).click();
-		await page
-			.locator('.provider-card')
-			.filter({ hasText: '内置豆包' })
-			.getByRole('button', { name: '选为默认模型 ↗', exact: true })
-			.click();
+		await page.locator('.setting-row .arco-select-view').click();
+		await page.locator('.arco-select-option:visible').filter({hasText:'内置豆包'}).click();
 		await page.waitForFunction(() => document.querySelector('.provider-card.selected h3')?.textContent === '内置豆包');
 		await page.waitForFunction(() => document.querySelector('.ocs-save-status')?.dataset.state === 'success');
 		check(
@@ -152,14 +169,28 @@ const path = require('path');
 		await page.evaluate(() => {
 			window.store.render.setting.ocs.store['common.settings.modelSyncProbe'] = 'updated';
 		});
-		await waitForCourse((state) => state.frame?.probe === 'updated');
+		await waitForCourse((state) => state.frame?.closeSync === true);
+		await new Promise((resolve) => setTimeout(resolve, 3500));
 		const optedOut = await application.evaluate(() => globalThis.__modelTest.courseState());
-		check(optedOut.top.probe !== 'updated', 'Explicit per-page sync opt-out was ignored');
+		check(optedOut.top.probe !== 'updated' && optedOut.frame.probe !== 'updated', 'Profile sync opt-out was ignored');
 		await application.evaluate(() =>
 			globalThis.__modelTest.course.webContents.executeJavaScript("GM_setValue('background.app.closeSync', false)")
 		);
 		const resumed = await waitForCourse((state) => state.top.probe === 'updated');
 		check(resumed.top.timeOrigin === initial.top.timeOrigin, 'Resuming sync reloaded the page');
+		await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(900, 560));
+		await page.locator('.question-bank').hover();
+		await page.mouse.wheel(0, 1500); await page.waitForTimeout(200);
+		check(await page.locator('.question-bank').evaluate(el => el.scrollTop > 0), 'Model page does not scroll at small viewport');
+		await providerCard.getByTitle('配置模型', {exact:true}).click();
+		const smallModal = page.locator('.arco-modal:visible');
+		await smallModal.getByRole('button',{name:'取消',exact:true}).hover();
+		const modalBox = await smallModal.boundingBox();
+		await page.screenshot({path:path.join(evidence,'small-modal-debug.png')});
+		check(modalBox.y >= 0 && modalBox.y + modalBox.height <= (await page.evaluate(()=>innerHeight)), 'Model modal clipped outside viewport');
+		await smallModal.locator('.arco-modal-body').hover(); await page.mouse.wheel(0,1000);await page.waitForTimeout(200);
+		check(await smallModal.locator('.arco-modal-body').evaluate(el=>el.scrollTop>0), 'Model form body cannot scroll');
+		await smallModal.getByRole('button',{name:'取消',exact:true}).click();
 		check(errors.length === 0, `Renderer errors: ${errors.join('; ')}`);
 		await page.screenshot({ path: path.join(evidence, 'model-auto-sync.png') });
 		const report = {

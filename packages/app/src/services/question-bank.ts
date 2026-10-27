@@ -1,11 +1,13 @@
 import { app } from 'electron';
-import axios from 'axios';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { decryptRenderString, encryptRenderString } from '../crypto';
-import { DOUBAO_PROVIDER_ID, chatDoubao } from './doubao';
-import { listProviderModels, modelEndpoint, modelHeaders, modelRequestError, validateProviderAddress } from './model-provider';
+import { DOUBAO_PROVIDER_ID } from './doubao';
+import { listProviderModels, validateProviderAddress } from './model-provider';
+
+import { callProvider } from './model-request';
+import type { CapabilityPreset } from './model-capabilities';
 
 export type QuestionBankProtocol = 'openai-chat' | 'anthropic' | 'gemini';
 export type QuestionBankSource = 'manual' | 'import' | 'ai';
@@ -20,6 +22,9 @@ export interface QuestionBankProvider {
 	enabled: boolean;
 	hasApiKey?: boolean;
 	clearApiKey?: boolean;
+	reasoningEnabled?: boolean;
+	webSearchEnabled?: boolean;
+	capabilityPreset?: CapabilityPreset;
 }
 
 export interface QuestionBankSettings {
@@ -77,6 +82,10 @@ function writeAtomic(filePath: string, content: string) {
 	fs.renameSync(tempPath, filePath);
 }
 
+function normalizePreset(value: unknown): CapabilityPreset {
+	return ['openai', 'qwen', 'deepseek', 'compatible'].includes(String(value)) ? value as CapabilityPreset : 'auto';
+}
+
 function normalizeSettings(value: any): QuestionBankSettings {
 	const providers = Array.isArray(value?.providers)
 		? value.providers
@@ -88,6 +97,9 @@ function normalizeSettings(value: any): QuestionBankSettings {
 					baseUrl: String(provider.baseUrl || '').trim(),
 					model: String(provider.model || '').trim(),
 					apiKey: String(provider.apiKey || ''),
+					reasoningEnabled: provider.reasoningEnabled === true,
+					webSearchEnabled: provider.webSearchEnabled === true,
+					capabilityPreset: normalizePreset(provider.capabilityPreset),
 					enabled: provider.enabled !== false
 				}))
 		: [];
@@ -168,6 +180,9 @@ export function saveQuestionBankConfig(input: QuestionBankSettings): QuestionBan
 			model,
 			baseUrl: baseUrl.replace(/\/+$/, ''),
 			protocol: provider.protocol,
+			reasoningEnabled: provider.reasoningEnabled === true,
+			webSearchEnabled: provider.webSearchEnabled === true,
+			capabilityPreset: normalizePreset(provider.capabilityPreset),
 			enabled: provider.enabled !== false,
 			apiKey: provider.clearApiKey ? '' : String(provider.apiKey || '').trim() || previous?.apiKey || ''
 		} as QuestionBankProvider;
@@ -326,15 +341,6 @@ function parseImages(value: unknown): string[] {
 	}
 }
 
-function imageParts(images: string[]) {
-	return images
-		.map((image) => {
-			const match = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/);
-			return match ? { mediaType: match[1], data: match[2], url: image } : null;
-		})
-		.filter((image): image is { mediaType: string; data: string; url: string } => image !== null);
-}
-
 function buildPrompt(title: string, options: string, type: string) {
 	const kind = type.toLowerCase();
 	let answerRule = '答案只写正确答案文本，不要写推理过程。';
@@ -354,116 +360,6 @@ function buildPrompt(title: string, options: string, type: string) {
 	]
 		.filter(Boolean)
 		.join('\n\n');
-}
-
-function contentWithImages(prompt: string, images: ReturnType<typeof imageParts>, protocol: QuestionBankProtocol) {
-	if (protocol === 'openai-chat') {
-		return [
-			{ type: 'text', text: prompt },
-			...images.map((image) => ({ type: 'image_url', image_url: { url: image.url } }))
-		];
-	}
-	if (protocol === 'anthropic') {
-		return [
-			{ type: 'text', text: prompt },
-			...images.map((image) => ({
-				type: 'image',
-				source: { type: 'base64', media_type: image.mediaType, data: image.data }
-			}))
-		];
-	}
-	return [
-		{ text: prompt },
-		...images.map((image) => ({ inlineData: { mimeType: image.mediaType, data: image.data } }))
-	];
-}
-
-function readOpenAIStream(payload: string) {
-	const pieces: string[] = [];
-	for (const line of payload.split(/\r?\n/)) {
-		const text = line.trim();
-		if (!text.startsWith('data:')) continue;
-		const data = text.slice(5).trim();
-		if (!data || data === '[DONE]') continue;
-		try {
-			const event = JSON.parse(data);
-			const delta = event?.choices?.[0]?.delta?.content ?? event?.choices?.[0]?.message?.content;
-			const chunk = responseText(delta);
-			if (chunk) pieces.push(chunk);
-		} catch {
-			// 忽略无法解析的流片段。
-		}
-	}
-	return pieces.join('');
-}
-
-function responseText(value: any): string {
-	if (typeof value === 'string') return value;
-	if (Array.isArray(value)) return value.map((item) => (typeof item?.text === 'string' ? item.text : '')).join('\n');
-	return '';
-}
-
-async function callProvider(
-	provider: QuestionBankProvider,
-	prompt: string,
-	images: string[],
-	maxTokens = 800
-): Promise<string> {
-	if (provider.id === DOUBAO_PROVIDER_ID) {
-		if (images.length) throw new Error('当前内置豆包网关支持文本题目；图片题请先识别文字或选择支持图片的模型。');
-		return (await chatDoubao({ prompt, model: provider.model })).content;
-	}
-	const parts = imageParts(images);
-	const endpoint = modelEndpoint(provider);
-	const headers = modelHeaders(provider);
-	const timeout = 120000;
-	try {
-		if (provider.protocol === 'openai-chat') {
-			const userContent = parts.length ? contentWithImages(prompt, parts, provider.protocol) : prompt;
-			const messages = [{ role: 'user', content: userContent }];
-			const postChat = (body: Record<string, unknown>, responseType: 'json' | 'text' = 'json') =>
-				axios.post(endpoint, body, { headers, timeout, responseType });
-			try {
-				const { data } = await postChat({
-					model: provider.model,
-					messages,
-					stream: false
-				});
-				return responseText(data?.choices?.[0]?.message?.content);
-			} catch (error: any) {
-				if (error?.response?.status !== 400) throw error;
-				const { data } = await postChat({ model: provider.model, messages, stream: true }, 'text');
-				return readOpenAIStream(String(data || ''));
-			}
-		}
-		if (provider.protocol === 'anthropic') {
-			const { data } = await axios.post(
-				endpoint,
-				{
-					model: provider.model,
-					max_tokens: maxTokens,
-					system: '请遵守用户给出的题型规则，只返回 JSON 答案。',
-					messages: [{ role: 'user', content: contentWithImages(prompt, parts, provider.protocol) }]
-				},
-				{
-					headers,
-					timeout
-				}
-			);
-			return responseText(data?.content);
-		}
-		const { data } = await axios.post(
-			endpoint,
-			{
-				contents: [{ role: 'user', parts: contentWithImages(prompt, parts, provider.protocol) }],
-				generationConfig: { temperature: 0.1, maxOutputTokens: maxTokens }
-			},
-			{ headers, timeout }
-		);
-		return responseText(data?.candidates?.[0]?.content?.parts);
-	} catch (error: any) {
-		throw modelRequestError(error, provider.apiKey || '');
-	}
 }
 
 function parseAnswer(content: string, options: string, type: string) {
@@ -551,7 +447,7 @@ export async function queryQuestionBank(input: {
 	const provider = settings.providers.find((item) => item.id === settings.selectedProviderId && item.enabled);
 	if (!provider) throw new Error('尚未配置可用模型。请在软件侧边栏「模型接入」中添加并保存模型。');
 	const prompt = buildPrompt(title, options, type);
-	const content = await callProvider(provider, prompt, parseImages(input.images));
+	const content = await callProvider(provider, prompt, parseImages(input.images), 800, title);
 	const answer = parseAnswer(content, options, type);
 	let id = `ai-${crypto.randomUUID()}`;
 	if (settings.autoSaveAiAnswers) {

@@ -162,3 +162,10 @@ dist/
 /docs/model-sync-20261027/*-result.json
 /docs/model-sync-20261027/*.png
 /docs/model-sync-20261027/upload/
+
+/docs/model-browser-fixes/*-profile*/
+/docs/model-browser-fixes/browser-profile-*/
+/docs/model-browser-fixes/*.png
+/docs/model-browser-fixes/*-result.json
+/docs/model-browser-fixes/drag-dom.json
+/docs/model-browser-fixes/upload/

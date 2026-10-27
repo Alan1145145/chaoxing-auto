@@ -43,12 +43,18 @@
 					<a-select
 						:model-value="settings.selectedProviderId || undefined"
 						:options="enabledProviderOptions"
-						:disabled="enabledProviderOptions.length === 0"
+						:disabled="enabledProviderOptions.length === 0 || savingConfig"
 						placeholder="选择默认模型"
 						style="width: 300px"
 						@change="setDefaultProvider"
 					/>
 				</div>
+			</div>
+
+			<div v-if="selectedProvider" class="capability-controls">
+				<a-button :type="selectedProvider.reasoningEnabled ? 'primary' : 'secondary'" :disabled="savingConfig" :aria-pressed="!!selectedProvider.reasoningEnabled" @click="toggleCapability('reasoningEnabled')">思考模式：{{ selectedProvider.reasoningEnabled ? '增强' : '模型默认' }}</a-button>
+				<a-button :type="selectedProvider.webSearchEnabled ? 'primary' : 'secondary'" :disabled="savingConfig" :aria-pressed="!!selectedProvider.webSearchEnabled" @click="toggleCapability('webSearchEnabled')">联网搜索：{{ selectedProvider.webSearchEnabled ? '开启' : '关闭' }}</a-button>
+				<span class="page-status">切换后自动保存。增强思考需模型支持；联网会使用服务商搜索或通用搜索资料。</span>
 			</div>
 
 			<div class="ocs-config-card">
@@ -79,6 +85,7 @@
 			:title="providerEditing ? '编辑模型接入' : '添加模型接入'"
 			:ok-loading="savingProvider"
 			:width="620"
+			modal-class="model-provider-modal"
 			:on-before-ok="saveProvider"
 		>
 			<a-form
@@ -151,6 +158,15 @@
 						清除已保存的密钥
 					</a-checkbox>
 				</a-form-item>
+				<a-form-item v-if="providerForm.protocol === 'openai-chat'" label="能力适配">
+					<a-select v-model="providerForm.capabilityPreset" :options="capabilityOptions" />
+				</a-form-item>
+				<a-form-item label="模型能力">
+					<a-space wrap>
+						<a-checkbox v-model="providerForm.reasoningEnabled">增强思考</a-checkbox>
+						<a-checkbox v-model="providerForm.webSearchEnabled">联网搜索</a-checkbox>
+					</a-space>
+				</a-form-item>
 				<a-form-item>
 					<a-switch v-model="providerForm.enabled" />
 					<span class="inline-label">启用该模型</span>
@@ -214,8 +230,23 @@ const emptyProvider = (): ProviderForm => ({
 	apiKey: '',
 	enabled: true,
 	hasApiKey: false,
-	clearApiKey: false
+	clearApiKey: false,
+	reasoningEnabled: false, webSearchEnabled: false, capabilityPreset: 'auto'
 });
+
+const capabilityOptions = [
+	{ label: '自动识别', value: 'auto' }, { label: 'OpenAI（联网使用 Responses）', value: 'openai' },
+	{ label: '通义千问', value: 'qwen' }, { label: 'DeepSeek', value: 'deepseek' },
+	{ label: '通用兼容（联网使用搜索资料）', value: 'compatible' }
+];
+
+async function toggleCapability(key: 'reasoningEnabled' | 'webSearchEnabled') {
+	if (!selectedProvider.value || savingConfig.value) return;
+	const provider = selectedProvider.value;
+	const previous = provider[key];
+	selectedProvider.value[key] = !selectedProvider.value[key];
+	if (!(await saveConfig())) provider[key] = previous;
+}
 
 const settings = ref<QuestionBankSettings>({ providers: [], selectedProviderId: null, autoSaveAiAnswers: true });
 const savingConfig = ref(false);
@@ -302,8 +333,9 @@ async function loadSettings() {
 
 async function setDefaultProvider(value: string | number | undefined) {
 	if (savingConfig.value) return;
+	const previous = settings.value.selectedProviderId;
 	settings.value.selectedProviderId = value ? String(value) : null;
-	await saveConfig();
+	if (!(await saveConfig())) settings.value.selectedProviderId = previous;
 }
 
 function changeProviderProtocol() {
@@ -461,12 +493,14 @@ async function saveConfig() {
 		ocsSaveState.value = 'success';
 		ocsSaveMessage.value = '已保存并接入 OCS，课程脚本将自动同步';
 		Message.success('模型已保存，自动答题会使用该模型。');
+		return true;
 	} catch (error) {
 		ocsSaveState.value = 'error';
 		ocsSaveMessage.value = modelSettingsSaved
 			? `模型已保存，但 OCS 配置保存失败：${String(error)}`
 			: `保存失败：${String(error)}`;
 		Message.error(ocsSaveMessage.value);
+		return false;
 	} finally {
 		savingConfig.value = false;
 	}
@@ -478,6 +512,7 @@ onActivated(() => {
 </script>
 
 <style scoped lang="less">
+.capability-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 16px 0; }
 .model-picker {
 	display: flex;
 	gap: 8px;

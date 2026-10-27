@@ -45,6 +45,7 @@ type NetworkState = {
 };
 
 const embeddedContents = new Map<string, WebContents>();
+const profileContents = new Map<string, Set<WebContents>>();
 const networkStates = new Map<number, NetworkState>();
 const mousePositions = new Map<number, { x: number; y: number }>();
 const registeredContents = new WeakSet<WebContents>();
@@ -61,10 +62,10 @@ export async function prepareEmbeddedBrowser(uid: string) {
 }
 
 /** Install the bundled OCSJS userscript into this WebContents without a Chrome extension. */
-export async function syncEmbeddedOcsjs(uid: string, enabled: boolean) {
+export async function syncEmbeddedOcsjs(uid: string, enabled: boolean, webContentsId?: number) {
 	assertUid(uid);
 	const previous = embeddedSyncQueues.get(uid) || Promise.resolve();
-	const current = previous.catch(() => undefined).then(() => syncEmbeddedOcsjsNow(uid, enabled));
+	const current = previous.catch(() => undefined).then(() => syncEmbeddedOcsjsNow(uid, enabled, webContentsId));
 	embeddedSyncQueues.set(uid, current);
 	try {
 		return await current;
@@ -73,8 +74,9 @@ export async function syncEmbeddedOcsjs(uid: string, enabled: boolean) {
 	}
 }
 
-async function syncEmbeddedOcsjsNow(uid: string, enabled: boolean) {
-	const contents = embeddedContents.get(uid);
+async function syncEmbeddedOcsjsNow(uid: string, enabled: boolean, webContentsId?: number) {
+	const contents = webContentsId === undefined ? embeddedContents.get(uid) : webContents.fromId(webContentsId);
+	if (webContentsId !== undefined && (!contents || !profileContents.get(uid)?.has(contents))) throw new Error('标签页未注册。');
 	if (!contents || isContentsDestroyed(contents)) throw new Error('内嵌网页尚未就绪，请等待页面加载完成后重试。');
 	const contentsId = getContentsId(contents);
 	const state = contentsId === undefined ? undefined : networkStates.get(contentsId);
@@ -121,7 +123,7 @@ async function syncEmbeddedOcsjsNow(uid: string, enabled: boolean) {
 }
 
 /** Associate the guest webContents with its browser profile for the OCSJS bridge. */
-export function registerEmbeddedWebContents(uid: string, webContentsId: number) {
+export function registerEmbeddedWebContents(uid: string, webContentsId: number, active = true) {
 	assertUid(uid);
 	const contents = webContents.fromId(webContentsId);
 	if (!contents || contents.isDestroyed()) throw new Error('内嵌网页已关闭，请重新打开浏览器。');
@@ -129,11 +131,10 @@ export function registerEmbeddedWebContents(uid: string, webContentsId: number) 
 	const expectedSession = session.fromPartition(`persist:ocs-${uid}`);
 	if (contents.session !== expectedSession) throw new Error('浏览器会话不匹配。');
 
-	const previous = embeddedContents.get(uid);
-	if (previous && getContentsId(previous) !== contentsId) {
-		unregisterContents(previous);
-	}
-	embeddedContents.set(uid, contents);
+	const tabs = profileContents.get(uid) || new Set<WebContents>();
+	tabs.add(contents);
+	profileContents.set(uid, tabs);
+	if (active || !embeddedContents.has(uid)) embeddedContents.set(uid, contents);
 	attachNetworkObserver(contents);
 
 	if (!registeredContents.has(contents)) {
@@ -149,6 +150,7 @@ export function registerEmbeddedWebContents(uid: string, webContentsId: number) 
 		});
 		contents.once('destroyed', () => {
 			registeredContents.delete(contents);
+			profileContents.get(uid)?.delete(contents);
 			if (getContentsId(embeddedContents.get(uid)) === contentsId) embeddedContents.delete(uid);
 			unregisterContents(contents);
 		});
@@ -158,8 +160,8 @@ export function registerEmbeddedWebContents(uid: string, webContentsId: number) 
 }
 
 export function unregisterEmbeddedBrowser(uid: string) {
-	const contents = embeddedContents.get(uid);
-	if (contents) unregisterContents(contents);
+	for (const contents of profileContents.get(uid) || []) unregisterContents(contents);
+	profileContents.delete(uid);
 	embeddedContents.delete(uid);
 }
 
@@ -172,7 +174,7 @@ export function findEmbeddedWebContents(pageUrl: string): WebContents | undefine
 		return;
 	}
 
-	for (const contents of embeddedContents.values()) {
+	for (const contents of new Set([...embeddedContents.values(), ...Array.from(profileContents.values()).flatMap((tabs) => [...tabs])])) {
 		if (contents.isDestroyed()) continue;
 		try {
 			const current = new URL(contents.getURL());
@@ -811,15 +813,16 @@ function createOcsjsRuntimeSource(
 		}
 	};
 	const __ocsValueCache = new Map();
+	const __ocsSnapshot = __ocsSharedStorage.call('snapshot', '') || {};
+	const __ocsDeleted = (value) => value && typeof value === 'object' && value.__ocsDeleted === true;
 	const __ocsGetValue = (key, fallback) => {
 		const storageKey = __ocsStoragePrefix + String(key);
-		if (__ocsValueCache.has(storageKey)) return __ocsValueCache.get(storageKey);
-		const shared = __ocsSharedStorage.call('get', storageKey);
-		if (shared !== undefined) { __ocsValueCache.set(storageKey, shared); return shared; }
-		if (__ocsSharedStorage.call('has', storageKey)) { __ocsValueCache.set(storageKey, fallback); return fallback; }
+		if (__ocsValueCache.has(storageKey)) { const cached = __ocsValueCache.get(storageKey); return __ocsDeleted(cached) ? fallback : cached; }
+		if (Object.prototype.hasOwnProperty.call(__ocsSnapshot, storageKey)) {
+			const shared = __ocsSnapshot[storageKey]; __ocsValueCache.set(storageKey, shared); return __ocsDeleted(shared) ? fallback : shared;
+		}
 		const legacy = __ocsReadJson(localStorage, storageKey, undefined);
 		if (legacy !== undefined) { __ocsSharedStorage.call('set', storageKey, legacy); __ocsValueCache.set(storageKey, legacy); return legacy; }
-		__ocsValueCache.set(storageKey, fallback);
 		return fallback;
 	};
 	const __ocsEmitChange = (key, oldValue, newValue, remote) => {
@@ -839,20 +842,24 @@ function createOcsjsRuntimeSource(
 	globalThis.GM_setValue = (key, value) => {
 		const storageKey = __ocsStoragePrefix + String(key);
 		const oldValue = __ocsGetValue(key, undefined);
+		if (JSON.stringify(oldValue) === JSON.stringify(value)) return;
 		__ocsValueCache.set(storageKey, value);
+		__ocsSnapshot[storageKey] = value;
 		try { __ocsSharedStorage.call('set', storageKey, value); localStorage.setItem(storageKey, JSON.stringify(value)); __ocsEmitChange(String(key), oldValue, value, false); }
 		catch (error) { console.error('OCS GM_setValue failed', error); }
 	};
 	globalThis.GM_deleteValue = (key) => {
 		const oldValue = __ocsGetValue(key, undefined);
-		__ocsValueCache.delete(__ocsStoragePrefix + String(key));
+		__ocsValueCache.set(__ocsStoragePrefix + String(key), { __ocsDeleted: true });
+		__ocsSnapshot[__ocsStoragePrefix + String(key)] = { __ocsDeleted: true };
 		try { __ocsSharedStorage.call('delete', __ocsStoragePrefix + String(key)); localStorage.removeItem(__ocsStoragePrefix + String(key)); __ocsEmitChange(String(key), oldValue, undefined, false); }
 		catch (error) { console.error('OCS GM_deleteValue failed', error); }
 	};
 	globalThis.GM_listValues = () => {
-		const keys = __ocsSharedStorage.call('keys', '').filter(key => key.startsWith(__ocsStoragePrefix)).map(key => key.slice(__ocsStoragePrefix.length));
+		const keys = Object.keys(__ocsSnapshot).filter(key => key.startsWith(__ocsStoragePrefix) && !__ocsDeleted(__ocsSnapshot[key])).map(key => key.slice(__ocsStoragePrefix.length));
 		for (let index = 0; index < localStorage.length; index++) {
 			const key = localStorage.key(index);
+			if (Object.prototype.hasOwnProperty.call(__ocsSnapshot, key) && __ocsDeleted(__ocsSnapshot[key])) continue;
 			if (key && key.startsWith(__ocsStoragePrefix) && key !== __ocsTabStorageKey && !keys.includes(key.slice(__ocsStoragePrefix.length))) keys.push(key.slice(__ocsStoragePrefix.length));
 		}
 		return keys;
@@ -932,7 +939,21 @@ function createOcsjsRuntimeSource(
 	window.addEventListener('storage', (event) => {
 		if (!event.key || !event.key.startsWith(__ocsStoragePrefix) || event.key === __ocsTabStorageKey) return;
 		const key = event.key.slice(__ocsStoragePrefix.length);
-		__ocsEmitChange(key, __ocsReadJson({ getItem: () => event.oldValue }, key, undefined), __ocsReadJson({ getItem: () => event.newValue }, key, undefined), true);
+		const value = event.newValue === null ? { __ocsDeleted: true } : __ocsReadJson({ getItem: () => event.newValue }, key, undefined);
+		const old = __ocsGetValue(key, undefined);
+		__ocsSnapshot[event.key] = value; __ocsValueCache.set(event.key, value);
+		const next = __ocsDeleted(value) ? undefined : value;
+		if (JSON.stringify(old) !== JSON.stringify(next)) __ocsEmitChange(key, old, next, true);
+	});
+	window.addEventListener('ocs-gm-values-changed', (event) => {
+		for (const [storageKey, value] of Object.entries(event.detail || {})) {
+			if (!storageKey.startsWith(__ocsStoragePrefix) || storageKey === __ocsTabStorageKey) continue;
+			const key = storageKey.slice(__ocsStoragePrefix.length);
+			const old = __ocsGetValue(key, undefined);
+			__ocsSnapshot[storageKey] = value; __ocsValueCache.set(storageKey, value);
+			const next = __ocsDeleted(value) ? undefined : value;
+			if (JSON.stringify(old) !== JSON.stringify(next)) __ocsEmitChange(key, old, next, true);
+		}
 	});
 
 	try {

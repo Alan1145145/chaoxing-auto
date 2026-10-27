@@ -23,12 +23,12 @@ export function validateProviderAddress(provider: QuestionBankProvider) {
 }
 
 /** 保留服务商的自定义前缀；只有根地址才补默认 API 版本。 */
-function apiBase(provider: QuestionBankProvider) {
+export function apiBase(provider: QuestionBankProvider) {
 	const url = validateProviderAddress(provider);
 	const basePath = url.pathname.replace(/\/+$/, '');
 	const endpoint =
 		provider.protocol === 'openai-chat'
-			? /\/(?:chat\/completions|models)$/i
+			? /\/(?:chat\/completions|responses|models)$/i
 			: provider.protocol === 'anthropic'
 			? /\/(?:messages|models)$/i
 			: /\/models(?:\/[^/]+(?::generateContent)?)?$/i;
