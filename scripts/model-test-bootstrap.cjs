@@ -37,6 +37,7 @@ app
 		await win.loadFile(path.join(appRoot, 'public/index.html'));
 		win.show();
 		globalThis.__modelTest = {
+			modules: { bank: load('src/services/question-bank'), storage: load('src/utils/embedded-storage'), axios, embedded },
 			messages: [],
 			configState() {
 				const settings = load('src/services/question-bank').getQuestionBankConfig();

@@ -69,13 +69,17 @@ app.whenReady().then(async () => {
   const {decryptRenderString}=require('../packages/app/lib/src/crypto');
   const persisted=JSON.parse(decryptRenderString(originalRead(path.join(app.getPath('userData'),'embedded-settings/fixture.json'),'utf8')));eq(persisted.key,{__ocsDeleted:true});
   fs.readFileSync=originalRead;fs.renameSync=originalRename;
-  const baseline=require('../packages/app/dist-model-sync-20261027/win-unpacked/resources/app/lib/src/utils/embedded-storage');
-  let baselineReads=0,baselineWrites=0;
+  const baselineFile=path.resolve(__dirname,'../packages/app/dist-model-sync-20261027/win-unpacked/resources/app/lib/src/utils/embedded-storage.js');
+  let baselineReads=null,baselineWrites=null;
+  if(fs.existsSync(baselineFile)) {
+  const baseline=require(baselineFile);
+  baselineReads=0;baselineWrites=0;
   fs.readFileSync=function(file,...args){if(String(file).includes('embedded-settings')) baselineReads++;return originalRead.call(this,file,...args);};
   fs.renameSync=function(file,...args){if(String(file).includes('embedded-settings')) baselineWrites++;return originalRename.call(this,file,...args);};
   for(let i=0;i<1000;i++){baseline.performEmbeddedStorage('baseline','set','key',i);baseline.performEmbeddedStorage('baseline','get','key');}
   fs.readFileSync=originalRead;fs.renameSync=originalRename;
   eq(baselineWrites,1000);eq(baselineReads,1999);
+  }
   const report={result:'PASS',assertions,requests:seen.length,storage:{operations:2000,diskReads:reads,diskWrites:writes,baselineReads,baselineWrites}};
   fs.writeFileSync(path.join(evidence,'capabilities-result.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
  } finally {axios.interceptors.request.eject(interceptor);server.closeAllConnections();server.close();app.quit();}

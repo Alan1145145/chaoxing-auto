@@ -4,6 +4,7 @@ import { DOUBAO_PROVIDER_ID, chatDoubao } from './doubao';
 import { apiBase, modelEndpoint, modelHeaders, modelRequestError } from './model-provider';
 import { capabilityPreset, thinkingParameters } from './model-capabilities';
 import { searchContext } from './model-search';
+import { assertCompleteResponse, readOpenAIStream } from './model-response';
 
 function imageParts(images: string[]) {
 	return images
@@ -34,25 +35,6 @@ function contentWithImages(prompt: string, images: ReturnType<typeof imageParts>
 		{ text: prompt },
 		...images.map((image) => ({ inlineData: { mimeType: image.mediaType, data: image.data } }))
 	];
-}
-
-function readOpenAIStream(payload: string) {
-	const pieces: string[] = [];
-	for (const line of payload.split(/\r?\n/)) {
-		const text = line.trim();
-		if (!text.startsWith('data:')) continue;
-		const data = text.slice(5).trim();
-		if (!data || data === '[DONE]') continue;
-		try {
-			const event = JSON.parse(data);
-			const delta = event?.choices?.[0]?.delta?.content ?? event?.choices?.[0]?.message?.content;
-			const chunk = responseText(delta);
-			if (chunk) pieces.push(chunk);
-		} catch {
-			// 忽略无法解析的流片段。
-		}
-	}
-	return pieces.join('');
 }
 
 function responseText(value: any): string {
@@ -90,7 +72,7 @@ export async function callProvider(
 					tools: [{ type: 'web_search' }], tool_choice: 'required',
 					...(provider.reasoningEnabled ? { reasoning: { effort: 'high' } } : {})
 				}, { headers, timeout });
-				if (data?.error || data?.status === 'incomplete') throw new Error(data?.error?.message || '联网模型未完成回答，请重试。');
+				assertCompleteResponse(data, 'responses');
 				return (data?.output || []).filter((item: any) => item.type === 'message').map((item: any) => responseText(item.content)).join('\n');
 			}
 			const userContent = parts.length ? contentWithImages(prompt, parts, provider.protocol) : prompt;
@@ -105,7 +87,8 @@ export async function callProvider(
 					...thinking,
 					...(provider.webSearchEnabled && preset === 'qwen' ? { enable_search: true, search_options: { forced_search: true } } : {})
 				});
-				if (typeof data === 'string' && data.trimStart().startsWith('data:')) return readOpenAIStream(data);
+				if (typeof data === 'string' && /^(?::|(?:data|event|id|retry):)/m.test(data.trimStart())) return readOpenAIStream(data);
+				assertCompleteResponse(data, 'openai-chat');
 				return responseText(data?.choices?.[0]?.message?.content);
 			} catch (error: any) {
 				if (error?.response?.status !== 400 || !/stream/i.test(JSON.stringify(error?.response?.data))) throw error;
@@ -130,6 +113,7 @@ export async function callProvider(
 					timeout
 				}
 			);
+			assertCompleteResponse(data, 'anthropic');
 			if (data?.content?.some((item: any) => item.type === 'web_search_tool_result' && item.content?.type === 'web_search_tool_result_error')) throw new Error('服务商联网搜索失败，请检查模型权限。');
 			return responseText(data?.content?.filter((item: any) => item.type === 'text'));
 		}
@@ -142,6 +126,7 @@ export async function callProvider(
 			},
 			{ headers, timeout }
 		);
+		assertCompleteResponse(data, 'gemini');
 		return responseText(data?.candidates?.[0]?.content?.parts?.filter((item: any) => !item.thought));
 	} catch (error: any) {
 		throw modelRequestError(error, provider.apiKey || '');

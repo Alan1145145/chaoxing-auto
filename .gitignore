@@ -169,3 +169,5 @@ dist/
 /docs/model-browser-fixes/*-result.json
 /docs/model-browser-fixes/drag-dom.json
 /docs/model-browser-fixes/upload/
+
+/docs/audit-1.0.3/upload/

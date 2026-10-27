@@ -815,20 +815,21 @@ function createOcsjsRuntimeSource(
 	const __ocsValueCache = new Map();
 	const __ocsSnapshot = __ocsSharedStorage.call('snapshot', '') || {};
 	const __ocsDeleted = (value) => value && typeof value === 'object' && value.__ocsDeleted === true;
+	const __ocsCloneValue = (value) => value !== null && typeof value === 'object' ? JSON.parse(JSON.stringify(value)) : value;
 	const __ocsGetValue = (key, fallback) => {
 		const storageKey = __ocsStoragePrefix + String(key);
-		if (__ocsValueCache.has(storageKey)) { const cached = __ocsValueCache.get(storageKey); return __ocsDeleted(cached) ? fallback : cached; }
+		if (__ocsValueCache.has(storageKey)) { const cached = __ocsValueCache.get(storageKey); return __ocsDeleted(cached) ? fallback : __ocsCloneValue(cached); }
 		if (Object.prototype.hasOwnProperty.call(__ocsSnapshot, storageKey)) {
-			const shared = __ocsSnapshot[storageKey]; __ocsValueCache.set(storageKey, shared); return __ocsDeleted(shared) ? fallback : shared;
+			const shared = __ocsSnapshot[storageKey]; __ocsValueCache.set(storageKey, shared); return __ocsDeleted(shared) ? fallback : __ocsCloneValue(shared);
 		}
 		const legacy = __ocsReadJson(localStorage, storageKey, undefined);
-		if (legacy !== undefined) { __ocsSharedStorage.call('set', storageKey, legacy); __ocsValueCache.set(storageKey, legacy); return legacy; }
+		if (legacy !== undefined) { __ocsSharedStorage.call('set', storageKey, legacy); __ocsValueCache.set(storageKey, legacy); return __ocsCloneValue(legacy); }
 		return fallback;
 	};
 	const __ocsEmitChange = (key, oldValue, newValue, remote) => {
 		for (const entry of __ocsListeners.values()) {
 			if (entry.key === key) {
-				try { entry.listener(key, oldValue, newValue, remote); } catch (error) { console.error(error); }
+				try { entry.listener(key, __ocsCloneValue(oldValue), __ocsCloneValue(newValue), remote); } catch (error) { console.error(error); }
 			}
 		}
 	};
@@ -843,8 +844,9 @@ function createOcsjsRuntimeSource(
 		const storageKey = __ocsStoragePrefix + String(key);
 		const oldValue = __ocsGetValue(key, undefined);
 		if (JSON.stringify(oldValue) === JSON.stringify(value)) return;
-		__ocsValueCache.set(storageKey, value);
-		__ocsSnapshot[storageKey] = value;
+		const stored = __ocsCloneValue(value);
+		__ocsValueCache.set(storageKey, stored);
+		__ocsSnapshot[storageKey] = stored;
 		try { __ocsSharedStorage.call('set', storageKey, value); localStorage.setItem(storageKey, JSON.stringify(value)); __ocsEmitChange(String(key), oldValue, value, false); }
 		catch (error) { console.error('OCS GM_setValue failed', error); }
 	};
@@ -998,7 +1000,7 @@ async function handleGmBinding(contents: WebContents, state: NetworkState, param
 			method: requestMethod as any,
 			headers: details.headers && typeof details.headers === 'object' ? details.headers : undefined,
 			data: details.data,
-			timeout: Math.max(1000, Math.min(Number(details.timeout) || 30000, 120000)),
+			timeout: Math.max(1000, Math.min(Number(details.timeout) || 30000, 300000)),
 			responseType: 'arraybuffer',
 			maxContentLength: 30 * 1024 * 1024,
 			maxBodyLength: 30 * 1024 * 1024,

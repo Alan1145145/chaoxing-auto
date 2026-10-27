@@ -500,7 +500,8 @@ async function saveConfig() {
 			? `模型已保存，但 OCS 配置保存失败：${String(error)}`
 			: `保存失败：${String(error)}`;
 		Message.error(ocsSaveMessage.value);
-		return false;
+		// A downstream OCS save failure must not undo the already persisted model choice in the UI.
+		return modelSettingsSaved;
 	} finally {
 		savingConfig.value = false;
 	}
