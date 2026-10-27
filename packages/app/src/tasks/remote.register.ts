@@ -33,6 +33,7 @@ import {
 	queryQuestionBank,
 	importQuestionBankQuestions,
 	listQuestionBankQuestions,
+	listQuestionBankModels,
 	saveQuestionBankConfig,
 	saveQuestionBankQuestion,
 	testQuestionBankProvider
@@ -143,6 +144,7 @@ const methods = {
 	getRawScripts: () => JSON.parse(JSON.stringify(AutomationScripts)) as RawAutomationScript[],
 	getQuestionBankConfig,
 	saveQuestionBankConfig,
+	listQuestionBankModels,
 	listQuestionBankQuestions,
 	saveQuestionBankQuestion,
 	deleteQuestionBankQuestion,

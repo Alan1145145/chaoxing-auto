@@ -1,4 +1,4 @@
-import { BrowserWindow, WebContents, session, webContents } from 'electron';
+import { BrowserWindow, WebContents, session, webContents, webFrameMain } from 'electron';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
@@ -37,6 +37,7 @@ type NetworkState = {
 	gmAbortControllers: Map<string, AbortController>;
 	scriptInjectionIdentifiers: string[];
 	scriptMatchPatterns: string[];
+	scriptRuntimeSource?: string;
 	inflight: number;
 	lastNetworkActivityAt: number;
 	debuggerMessageHandler?: (...args: any[]) => void;
@@ -97,6 +98,7 @@ async function syncEmbeddedOcsjsNow(uid: string, enabled: boolean) {
 		const shouldReload = matchesUserscriptUrl(state.scriptMatchPatterns, getCurrentUrl(contents));
 		state.gmAllowedHosts = [];
 		state.scriptMatchPatterns = [];
+		state.scriptRuntimeSource = undefined;
 		if (shouldReload) contents.reload();
 		return { enabled: false };
 	}
@@ -105,6 +107,7 @@ async function syncEmbeddedOcsjsNow(uid: string, enabled: boolean) {
 		url: `http://127.0.0.1:${store.store.server.port || 15319}/api/embedded-gm-storage`,
 		token: getEmbeddedStorageToken(uid)
 	});
+	state.scriptRuntimeSource = source;
 	const result = await sendDebuggerCommand<{ identifier?: string }>(contents, 'Page.addScriptToEvaluateOnNewDocument', {
 		source
 	});
@@ -135,6 +138,15 @@ export function registerEmbeddedWebContents(uid: string, webContentsId: number) 
 
 	if (!registeredContents.has(contents)) {
 		registeredContents.add(contents);
+		// 新建课程框架可能没有执行 CDP 的文档启动脚本；加载后补注入，运行器会防止重复启动。
+		contents.on('did-frame-finish-load', (_event, _isMainFrame, processId, routingId) => {
+			const state = networkStates.get(contentsId);
+			const frame = webFrameMain.fromId(processId, routingId);
+			if (!state?.scriptRuntimeSource || !frame || !matchesUserscriptUrl(state.scriptMatchPatterns, frame.url)) return;
+			void frame.executeJavaScript(state.scriptRuntimeSource).catch((error) => {
+				if (!isContentsDestroyed(contents)) console.warn('课程框架脚本加载失败', String(error));
+			});
+		});
 		contents.once('destroyed', () => {
 			registeredContents.delete(contents);
 			if (getContentsId(embeddedContents.get(uid)) === contentsId) embeddedContents.delete(uid);
@@ -771,6 +783,9 @@ function createOcsjsRuntimeSource(
 	};
 	if (!__ocsPatterns.some((pattern) => __ocsMatches(pattern, location.href))) return;
 	const __ocsMeta = ${metadataJson};
+	const __ocsRuntimeKey = ${JSON.stringify(bindingName + '_version')};
+	if (globalThis[__ocsRuntimeKey] === __ocsMeta.version) return;
+	globalThis[__ocsRuntimeKey] = __ocsMeta.version;
 	const __ocsBinding = globalThis[${JSON.stringify(bindingName)}];
 	const __ocsResponseEvent = ${JSON.stringify(responseEvent)};
 	const __ocsStoragePrefix = '__ocs_gm__:' + __ocsMeta.namespace + ':' + __ocsMeta.name + ':';

@@ -12,6 +12,7 @@ export async function connectQuestionBank() {
 	).filter((item: any) => !names.has(item?.name));
 	wrappers.unshift(createOcsQuestionBankAnswererWrapper(`http://localhost:${Number(store.server.port) || 15319}`));
 	if (wrappers.length > 10) throw new Error('题库配置超过 10 个，请在模型接入页面整理配置。');
+	const previousOpenSync = store.render.setting.ocs.openSync;
 	store.render.setting.ocs.store = {
 		...current,
 		'common.settings.answererWrappers': wrappers,
@@ -23,5 +24,11 @@ export async function connectQuestionBank() {
 		).filter((name: string) => !names.has(name))
 	};
 	store.render.setting.ocs.openSync = true;
-	await remote.methods.call('saveStore', JSON.stringify(store), remote.methods.callSync('isEncryptionAvailable'));
+	try {
+		await remote.methods.call('saveStore', JSON.stringify(store), remote.methods.callSync('isEncryptionAvailable'));
+	} catch (error) {
+		store.render.setting.ocs.store = current;
+		store.render.setting.ocs.openSync = previousOpenSync;
+		throw error;
+	}
 }

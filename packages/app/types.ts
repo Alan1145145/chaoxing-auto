@@ -2,6 +2,7 @@ import { OriginalAppStore } from './src/store';
 import { ScriptWorker } from './src/worker';
 
 export { RemoteMethods } from './src/tasks/remote.register';
+export type { QuestionBankModel } from './src/services/model-provider';
 export type {
 	QuestionBankPage,
 	QuestionBankProtocol,

@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { decryptRenderString, encryptRenderString } from '../crypto';
 import { DOUBAO_PROVIDER_ID, chatDoubao } from './doubao';
+import { listProviderModels, modelEndpoint, modelHeaders, modelRequestError, validateProviderAddress } from './model-provider';
 
 export type QuestionBankProtocol = 'openai-chat' | 'anthropic' | 'gemini';
 export type QuestionBankSource = 'manual' | 'import' | 'ai';
@@ -159,24 +160,7 @@ export function saveQuestionBankConfig(input: QuestionBankSettings): QuestionBan
 		if (!provider.id || !name || !model || !baseUrl) {
 			throw new Error('模型名称、服务地址和模型 ID 均不能为空。');
 		}
-		if (!['openai-chat', 'anthropic', 'gemini'].includes(provider.protocol)) {
-			throw new Error('不支持的模型接口协议。');
-		}
-		let parsedUrl: URL;
-		try {
-			parsedUrl = new URL(baseUrl);
-		} catch {
-			throw new Error('模型服务地址格式无效。');
-		}
-		if (
-			!['http:', 'https:'].includes(parsedUrl.protocol) ||
-			parsedUrl.username ||
-			parsedUrl.password ||
-			parsedUrl.search ||
-			parsedUrl.hash
-		) {
-			throw new Error('模型服务地址仅支持不含账号、查询参数或片段的 HTTP(S) 地址。');
-		}
+		validateProviderAddress({ ...provider, baseUrl });
 		const previous = currentById.get(provider.id);
 		return {
 			id: provider.id,
@@ -372,21 +356,6 @@ function buildPrompt(title: string, options: string, type: string) {
 		.join('\n\n');
 }
 
-function endpointFor(provider: QuestionBankProvider) {
-	const base = provider.baseUrl.replace(/\/+$/, '');
-	if (provider.protocol === 'openai-chat') {
-		if (/\/chat\/completions$/i.test(base)) return base;
-		return /\/v1$/i.test(base) ? `${base}/chat/completions` : `${base}/v1/chat/completions`;
-	}
-	if (provider.protocol === 'anthropic') {
-		if (/\/v1\/messages$/i.test(base)) return base;
-		return /\/v1$/i.test(base) ? `${base}/messages` : `${base}/v1/messages`;
-	}
-	return `${base}/models/${encodeURIComponent(provider.model)}:generateContent?key=${encodeURIComponent(
-		provider.apiKey || ''
-	)}`;
-}
-
 function contentWithImages(prompt: string, images: ReturnType<typeof imageParts>, protocol: QuestionBankProtocol) {
 	if (protocol === 'openai-chat') {
 		return [
@@ -434,16 +403,6 @@ function responseText(value: any): string {
 	return '';
 }
 
-function redactProviderError(detail: unknown, apiKey: string) {
-	let message = String(detail);
-	if (apiKey) {
-		for (const secret of new Set([apiKey, encodeURIComponent(apiKey)])) {
-			message = message.split(secret).join('[已隐藏]');
-		}
-	}
-	return message.replace(/([?&]key=)[^&\s]*/gi, '$1[已隐藏]');
-}
-
 async function callProvider(
 	provider: QuestionBankProvider,
 	prompt: string,
@@ -455,12 +414,11 @@ async function callProvider(
 		return (await chatDoubao({ prompt, model: provider.model })).content;
 	}
 	const parts = imageParts(images);
-	const endpoint = endpointFor(provider);
+	const endpoint = modelEndpoint(provider);
+	const headers = modelHeaders(provider);
 	const timeout = 120000;
 	try {
 		if (provider.protocol === 'openai-chat') {
-			const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-			if (provider.apiKey) headers.Authorization = `Bearer ${provider.apiKey}`;
 			const userContent = parts.length ? contentWithImages(prompt, parts, provider.protocol) : prompt;
 			const messages = [{ role: 'user', content: userContent }];
 			const postChat = (body: Record<string, unknown>, responseType: 'json' | 'text' = 'json') =>
@@ -488,11 +446,7 @@ async function callProvider(
 					messages: [{ role: 'user', content: contentWithImages(prompt, parts, provider.protocol) }]
 				},
 				{
-					headers: {
-						'Content-Type': 'application/json',
-						'x-api-key': provider.apiKey || '',
-						'anthropic-version': '2023-06-01'
-					},
+					headers,
 					timeout
 				}
 			);
@@ -504,19 +458,11 @@ async function callProvider(
 				contents: [{ role: 'user', parts: contentWithImages(prompt, parts, provider.protocol) }],
 				generationConfig: { temperature: 0.1, maxOutputTokens: maxTokens }
 			},
-			{ headers: { 'Content-Type': 'application/json' }, timeout }
+			{ headers, timeout }
 		);
 		return responseText(data?.candidates?.[0]?.content?.parts);
 	} catch (error: any) {
-		const body = error?.response?.data;
-		const detail =
-			body?.error?.message ||
-			body?.message ||
-			(typeof body === 'string' ? body : '') ||
-			(error?.code === 'ECONNABORTED' ? '请求超时' : error?.message) ||
-			'未知错误';
-		const safeDetail = redactProviderError(detail, provider.apiKey || '').slice(0, 500);
-		throw new Error(`模型请求失败：${safeDetail}`);
+		throw modelRequestError(error, provider.apiKey || '');
 	}
 }
 
@@ -615,12 +561,24 @@ export async function queryQuestionBank(input: {
 	return { id, answer, source: 'ai' as const, question: title };
 }
 
-export async function testQuestionBankProvider(input: QuestionBankProvider) {
+function providerWithSavedKey(input: QuestionBankProvider): QuestionBankProvider {
 	const current = readSettings().providers.find((provider) => provider.id === input.id);
 	const provider = {
 		...input,
-		apiKey: String(input.apiKey || '').trim() || current?.apiKey || ''
+		baseUrl: String(input.baseUrl || '').trim(),
+		model: String(input.model || '').trim(),
+		apiKey: input.clearApiKey ? '' : String(input.apiKey || '').trim() || current?.apiKey || ''
 	};
+	validateProviderAddress(provider);
+	return provider;
+}
+
+export async function listQuestionBankModels(input: QuestionBankProvider) {
+	return listProviderModels(providerWithSavedKey(input));
+}
+
+export async function testQuestionBankProvider(input: QuestionBankProvider) {
+	const provider = providerWithSavedKey(input);
 	if (!provider.model || !provider.baseUrl) throw new Error('请填写服务地址和模型 ID。');
 	const startedAt = Date.now();
 	const content = await callProvider(provider, '请只返回 JSON：{"answer":"OK"}', [], 64);

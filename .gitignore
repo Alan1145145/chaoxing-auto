@@ -153,3 +153,12 @@ dist/
 # Generated OCSJS 5 userscript and style bundle
 /packages/web/public/ocsjs/
 /packages/app/public/ocsjs/
+
+# Local releases, bugfix backups and isolated model integration profiles
+/packages/app/dist-*/
+/docs/**/before/
+/docs/model-sync-20261027/*-profile/
+/docs/model-sync-20261027/ui-profile-*/
+/docs/model-sync-20261027/*-result.json
+/docs/model-sync-20261027/*.png
+/docs/model-sync-20261027/upload/

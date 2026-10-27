@@ -453,35 +453,30 @@ export const BackgroundProject = Project.create({
 					}
 				});
 			},
-			async onactive() {
-				if ($.isInTopWindow()) {
-					if (this.cfg.closeSync) {
-						$console.log('配置同步已关闭');
-						return;
-					}
-					this.cfg.sync_status = 'unconnect';
+			async onstart() {
+				let syncing = false;
+				let lastSnapshot = '';
+				let panelsLocked = false;
+				// 每个课程框架都有独立的配置缓存，均需持续读取桌面配置。
+				const sync = async () => {
+					if (this.cfg.closeSync || syncing) return;
+					syncing = true;
 					try {
-						const res = await request('http://localhost:15319/browser', {
+						const config = await request('http://localhost:15319/ocs-global-setting', {
 							type: 'GM_xmlhttpRequest',
 							method: 'get',
 							responseType: 'json'
 						});
-						if (!res) {
+						if (!config) {
 							this.cfg.sync_status = 'unconnect';
 							return;
 						}
-						const open_sync = await request('http://localhost:15319/is-browser-config-sync', {
-							type: 'GM_xmlhttpRequest',
-							method: 'get',
-							responseType: 'text'
-						});
-
-						if (open_sync !== 'true') {
+						if (config.openSync !== true) {
 							this.cfg.sync_status = 'not_open_sync';
 							return;
 						}
-
-						if (Object.keys(res).length === 0) {
+						const res = config.store;
+						if (!res || typeof res !== 'object' || Array.isArray(res) || Object.keys(res).length === 0) {
 							this.cfg.sync_status = 'not_open_sync';
 							return;
 						}
@@ -537,67 +532,81 @@ export const BackgroundProject = Project.create({
 							}
 						}
 
-						// 同步所有的配置
-						for (const key in res) {
-							if (Object.prototype.hasOwnProperty.call(res, key)) {
-								$store.set(key, res[key]);
+						if (this.cfg.closeSync) return;
+						const snapshot = JSON.stringify(res);
+						if (snapshot !== lastSnapshot) {
+							for (const key in res) {
+								if (
+									Object.prototype.hasOwnProperty.call(res, key) &&
+									JSON.stringify($store.get(key)) !== JSON.stringify(res[key])
+								) {
+									$store.set(key, res[key]);
+								}
 							}
+							lastSnapshot = snapshot;
 						}
 
 						// 锁定面板
-						for (const project of definedProjects()) {
-							// 排除后台脚本的锁定
-							if (project.name === BackgroundProject.name) {
-								continue;
-							}
-							for (const key in project.scripts) {
-								if (Object.prototype.hasOwnProperty.call(project.scripts, key)) {
-									const script = project.scripts[key];
-									const originalRender = script.onrender;
-									// 重新定义渲染函数。在渲染后添加锁定面板的代码
-									script.onrender = ({ panel, header }) => {
-										originalRender?.({ panel, header });
-										if (panel.configsContainer.children.length) {
-											panel.configsContainer.classList.add('lock');
-											panel.lockWrapper.style.width = (panel.configsContainer.clientWidth ?? panel.clientWidth) + 'px';
-											panel.lockWrapper.style.height =
-												(panel.configsContainer.clientHeight ?? panel.clientHeight) + 'px';
-											panel.configsContainer.prepend(panel.lockWrapper);
+						if (!panelsLocked)
+							for (const project of definedProjects()) {
+								// 排除后台脚本的锁定
+								if (project.name === BackgroundProject.name) {
+									continue;
+								}
+								for (const key in project.scripts) {
+									if (Object.prototype.hasOwnProperty.call(project.scripts, key)) {
+										const script = project.scripts[key];
+										const originalRender = script.onrender;
+										// 重新定义渲染函数。在渲染后添加锁定面板的代码
+										script.onrender = ({ panel, header }) => {
+											originalRender?.({ panel, header });
+											if (panel.configsContainer.children.length) {
+												panel.configsContainer.classList.add('lock');
+												panel.lockWrapper.style.width =
+													(panel.configsContainer.clientWidth ?? panel.clientWidth) + 'px';
+												panel.lockWrapper.style.height =
+													(panel.configsContainer.clientHeight ?? panel.clientHeight) + 'px';
+												panel.configsContainer.prepend(panel.lockWrapper);
 
-											panel.lockWrapper.title =
-												'🚫已同步OCS桌面版软件配置，如需修改请在桌面版软件的左侧栏设置-通用设置-OCS配置，中进行修改。\n\n或者前往脚本悬浮窗:后台-软件配置同步 关闭配置同步功能。\n\n可双击强制修改，并关闭同步配置';
-											panel.lockWrapper = $ui.tooltip(panel.lockWrapper);
-											panel.lockWrapper.addEventListener('dblclick', () => {
-												panel.configsContainer.classList.remove('lock');
-												panel.lockWrapper.remove();
-												script.onrender = originalRender;
-												$message.warn({
-													content: '已解除配置同步，可正常修改配置。想开启同步请前往：后台-软件配置同步',
-													duration: 10
+												panel.lockWrapper.title =
+													'🚫已同步OCS桌面版软件配置，如需修改请在桌面版软件的左侧栏设置-通用设置-OCS配置，中进行修改。\n\n或者前往脚本悬浮窗:后台-软件配置同步 关闭配置同步功能。\n\n可双击强制修改，并关闭同步配置';
+												panel.lockWrapper = $ui.tooltip(panel.lockWrapper);
+												panel.lockWrapper.addEventListener('dblclick', () => {
+													panel.configsContainer.classList.remove('lock');
+													panel.lockWrapper.remove();
+													script.onrender = originalRender;
+													$message.warn({
+														content: '已解除配置同步，可正常修改配置。想开启同步请前往：后台-软件配置同步',
+														duration: 10
+													});
+													this.cfg.closeSync = true;
+													if (script.panel && script.header) {
+														script.onrender?.({ panel: script.panel, header: script.header });
+													}
 												});
-												this.cfg.closeSync = true;
-												if (script.panel && script.header) {
-													script.onrender?.({ panel: script.panel, header: script.header });
-												}
-											});
+											}
+										};
+										// 重新执行渲染
+										if (script.panel && script.header) {
+											script.onrender({ panel: script.panel, header: script.header });
 										}
-									};
-									// 重新执行渲染
-									if (script.panel && script.header) {
-										script.onrender({ panel: script.panel, header: script.header });
 									}
 								}
 							}
-						}
 
+						panelsLocked = true;
 						this.cfg.sync_status = 'synced';
 					} catch (e) {
 						console.error(e);
 						this.cfg.sync_status = 'unconnect';
 						// 可能是桌面软件未启动，或者未开启配置同步功能，此时直接隐藏脚本面板，防止用户误操作
 						this.hidePanel();
+					} finally {
+						syncing = false;
 					}
-				}
+				};
+				await sync();
+				setInterval(() => void sync(), 3000);
 			}
 		}),
 		update: new Script({

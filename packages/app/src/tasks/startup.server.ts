@@ -161,7 +161,7 @@ export async function startupServer() {
 
 	app.get('/ocs-global-setting', (req, res) => {
 		const render = getDecryptedRenderData(store);
-		res.json(render.setting.ocs);
+		res.json(render?.setting?.ocs || { store: {}, openSync: false });
 	});
 
 	/** OCSJS bridge environment probe for embedded and standalone browsers. */
@@ -183,7 +183,7 @@ export async function startupServer() {
 
 	app.get('/is-browser-config-sync', (req, res) => {
 		const render = getDecryptedRenderData(store);
-		res.end(String(render.setting.ocs.openSync));
+		res.end(String(render?.setting?.ocs?.openSync === true));
 	});
 
 	/** 脚本操作 */

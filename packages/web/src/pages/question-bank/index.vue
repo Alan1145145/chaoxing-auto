@@ -54,7 +54,7 @@
 			<div class="ocs-config-card">
 				<div>
 					<div class="section-title">脚本接入</div>
-					<div class="page-status">保存后写入课程脚本，并开启浏览器同步。已打开的课程页需要刷新后再答题。</div>
+					<div class="page-status">保存模型或切换默认模型后自动接入 OCS JS，已打开的课程页会自动同步。</div>
 				</div>
 				<div
 					class="ocs-save-status"
@@ -79,7 +79,7 @@
 			:title="providerEditing ? '编辑模型接入' : '添加模型接入'"
 			:ok-loading="savingProvider"
 			:width="620"
-			@ok="saveProvider"
+			:on-before-ok="saveProvider"
 		>
 			<a-form
 				:model="providerForm"
@@ -99,7 +99,7 @@
 						label="接口协议"
 						required
 					>
-						<a-select v-model="providerForm.protocol">
+						<a-select v-model="providerForm.protocol" @change="changeProviderProtocol">
 							<a-option value="openai-chat">OpenAI 兼容</a-option>
 							<a-option value="anthropic">Anthropic Messages</a-option>
 							<a-option value="gemini">Google Gemini</a-option>
@@ -119,11 +119,25 @@
 					label="模型 ID"
 					required
 				>
-					<a-input
-						v-model="providerForm.model"
-						placeholder="例如：deepseek-chat"
-					/>
+					<div class="model-picker">
+						<a-select
+							v-if="availableModels.length"
+							v-model="providerForm.model"
+							:options="modelOptions"
+							allow-search
+							allow-create
+							placeholder="选择或输入模型 ID"
+						/>
+						<a-input v-else v-model="providerForm.model" placeholder="例如：deepseek-chat" />
+						<a-button :loading="fetchingModels" :disabled="!providerForm.baseUrl.trim()" @click="fetchModels">
+							一键获取模型
+						</a-button>
+					</div>
 				</a-form-item>
+				<a-alert v-if="modelFetchError" type="warning" class="model-fetch-feedback">{{ modelFetchError }}</a-alert>
+				<div v-else-if="availableModels.length" class="page-status model-fetch-feedback">
+					已获取 {{ availableModels.length }} 个模型，可搜索选择，也可手动输入模型 ID。
+				</div>
 				<a-form-item label="API Key">
 					<a-input-password
 						v-model="providerForm.apiKey"
@@ -140,6 +154,7 @@
 				<a-form-item>
 					<a-switch v-model="providerForm.enabled" />
 					<span class="inline-label">启用该模型</span>
+					<a-button style="margin-left: auto" :loading="testingProviderId === providerForm.id" @click="testProvider(providerForm)">测试连接</a-button>
 				</a-form-item>
 				<div
 					v-if="providerForm.id === QWEN_PROVIDER_ID"
@@ -164,7 +179,7 @@
 					v-else
 					class="page-status"
 				>
-					支持 OpenAI 兼容接口、Anthropic 和 Gemini。请填写服务商控制台中的服务地址、模型 ID 和 API Key。
+					填写服务地址和 API Key 后，点击「一键获取模型」选择模型；也可手动填写模型 ID。点击确定即可保存并自动接入 OCS JS。
 				</div>
 			</a-form>
 		</a-modal>
@@ -172,10 +187,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, reactive, ref } from 'vue';
+import { computed, onActivated, reactive, ref, watch } from 'vue';
 import { Message, Modal } from '@arco-design/web-vue';
-import type { QuestionBankProtocol, QuestionBankProvider, QuestionBankSettings } from '@ocs-desktop/app';
-import { createOcsQuestionBankAnswererWrapper } from '@ocsjs/scripts';
+import type {
+	QuestionBankModel,
+	QuestionBankProtocol,
+	QuestionBankProvider,
+	QuestionBankSettings
+} from '@ocs-desktop/app';
+import { connectQuestionBank } from '@/utils/connect-question-bank';
 import Icon from '@/components/Icon.vue';
 import { remote } from '@/utils/remote';
 import { store } from '@/store';
@@ -203,6 +223,38 @@ const savingProvider = ref(false);
 const providerModalVisible = ref(false);
 const providerEditing = ref(false);
 const providerForm = reactive<ProviderForm>(emptyProvider());
+const availableModels = ref<QuestionBankModel[]>([]);
+const fetchingModels = ref(false);
+const modelFetchError = ref('');
+const testingProviderId = ref('');
+let modelRequestId = 0;
+const modelOptions = computed(() => {
+	const options = availableModels.value.map((model) => ({
+		label: model.name === model.id ? model.id : `${model.name} · ${model.id}`,
+		value: model.id
+	}));
+	if (providerForm.model && !options.some((option) => option.value === providerForm.model)) {
+		options.unshift({ label: `${providerForm.model}（手动填写）`, value: providerForm.model });
+	}
+	return options;
+});
+watch(
+	() => [
+		providerForm.id,
+		providerForm.protocol,
+		providerForm.baseUrl,
+		providerForm.apiKey,
+		providerForm.clearApiKey,
+		providerModalVisible.value
+	],
+	() => {
+		modelRequestId++;
+		availableModels.value = [];
+		modelFetchError.value = '';
+		fetchingModels.value = false;
+	},
+	{ flush: 'sync' }
+);
 const ocsSaveState = ref<'idle' | 'success' | 'error'>('idle');
 const ocsSaveMessage = ref('尚未保存到 OCS');
 
@@ -248,10 +300,37 @@ async function loadSettings() {
 	}
 }
 
-function setDefaultProvider(value: string | number | undefined) {
+async function setDefaultProvider(value: string | number | undefined) {
+	if (savingConfig.value) return;
 	settings.value.selectedProviderId = value ? String(value) : null;
-	ocsSaveState.value = 'idle';
-	ocsSaveMessage.value = '模型已选择，请点击保存配置';
+	await saveConfig();
+}
+
+function changeProviderProtocol() {
+	const defaults = {
+		'openai-chat': 'https://api.openai.com/v1',
+		anthropic: 'https://api.anthropic.com',
+		gemini: 'https://generativelanguage.googleapis.com/v1beta'
+	};
+	if (Object.values(defaults).includes(providerForm.baseUrl)) providerForm.baseUrl = defaults[providerForm.protocol];
+	providerForm.model = '';
+}
+
+async function fetchModels() {
+	const requestId = ++modelRequestId;
+	fetchingModels.value = true;
+	modelFetchError.value = '';
+	try {
+		const models = await remote.methods.call('listQuestionBankModels', { ...providerForm });
+		if (requestId !== modelRequestId) return;
+		availableModels.value = models;
+		if (!providerForm.model.trim()) providerForm.model = models[0]?.id || '';
+		Message.success(`已获取 ${models.length} 个模型。`);
+	} catch (error) {
+		if (requestId === modelRequestId) modelFetchError.value = String(error);
+	} finally {
+		if (requestId === modelRequestId) fetchingModels.value = false;
+	}
 }
 
 /** 通义千问：阿里云百炼 OpenAI 兼容接口（华北2·北京） */
@@ -281,7 +360,10 @@ function addQwen() {
 }
 
 function openProviderEditor(provider?: QuestionBankProvider) {
-	if (provider?.id === 'builtin-doubao') { void router.push('/doubao'); return; }
+	if (provider?.id === 'builtin-doubao') {
+		void router.push('/doubao');
+		return;
+	}
 	providerEditing.value = Boolean(provider);
 	Object.assign(providerForm, emptyProvider(), provider || {});
 	providerForm.apiKey = '';
@@ -290,36 +372,49 @@ function openProviderEditor(provider?: QuestionBankProvider) {
 }
 
 async function saveProvider() {
+	if (savingProvider.value || savingConfig.value) return false;
 	if (!providerForm.name.trim() || !providerForm.model.trim() || !providerForm.baseUrl.trim()) {
 		Message.warning('名称、服务地址和模型 ID 均不能为空。');
-		return;
+		return false;
 	}
 	savingProvider.value = true;
+	let modelSettingsSaved = false;
 	try {
 		const provider = { ...providerForm };
 		const providers = settings.value.providers.filter((item) => item.id !== provider.id).concat(provider);
 		settings.value = await remote.methods.call('saveQuestionBankConfig', {
 			...settings.value,
 			providers,
-			selectedProviderId: settings.value.selectedProviderId || provider.id
+			selectedProviderId: !providerEditing.value && provider.enabled ? provider.id : settings.value.selectedProviderId
 		});
-		providerModalVisible.value = false;
-		ocsSaveState.value = 'idle';
-		ocsSaveMessage.value = '模型已保存，请点击保存配置接入 OCS';
-		Message.success('模型接入已保存。');
+		modelSettingsSaved = true;
+		await connectQuestionBank();
+		ocsSaveState.value = 'success';
+		ocsSaveMessage.value = '已保存并接入 OCS，课程脚本将自动同步';
+		Message.success('模型已保存并自动接入 OCS JS。');
+		return true;
 	} catch (error) {
-		Message.error(String(error));
+		ocsSaveState.value = 'error';
+		ocsSaveMessage.value = modelSettingsSaved
+			? `模型已保存，但 OCS 接入失败：${String(error)}`
+			: `保存失败：${String(error)}`;
+		Message.error(ocsSaveMessage.value);
+		return false;
 	} finally {
 		savingProvider.value = false;
 	}
 }
 
 async function testProvider(provider: QuestionBankProvider) {
+	if (testingProviderId.value) return;
+	testingProviderId.value = provider.id;
 	try {
 		const result = await remote.methods.call('testQuestionBankProvider', provider);
 		Message.success(`模型连接成功，耗时 ${result.elapsedMs} ms。`);
 	} catch (error) {
 		Message.error(`模型连接失败：${String(error)}`);
+	} finally {
+		testingProviderId.value = '';
 	}
 }
 
@@ -338,8 +433,9 @@ function removeProvider(provider: QuestionBankProvider) {
 							? providers.find((item) => item.enabled)?.id || null
 							: settings.value.selectedProviderId
 				});
-				ocsSaveState.value = 'idle';
-				ocsSaveMessage.value = '模型列表已变化，请点击保存配置更新 OCS';
+				await connectQuestionBank();
+				ocsSaveState.value = 'success';
+				ocsSaveMessage.value = '已保存并接入 OCS，课程脚本将自动同步';
 				Message.success('模型接入已删除。');
 			} catch (error) {
 				Message.error(String(error));
@@ -349,6 +445,7 @@ function removeProvider(provider: QuestionBankProvider) {
 }
 
 async function saveConfig() {
+	if (savingConfig.value || savingProvider.value) return;
 	if (!selectedProvider.value) {
 		Message.warning('请先添加并选择一个启用的模型。');
 		return;
@@ -358,33 +455,11 @@ async function saveConfig() {
 	ocsSaveMessage.value = '正在保存模型并接入 OCS...';
 	let modelSettingsSaved = false;
 	try {
-		const currentStore = store.render.setting.ocs.store as Record<string, any>;
-		if (!currentStore || typeof currentStore !== 'object' || Array.isArray(currentStore)) {
-			throw new Error('OCS 配置数据格式无效，模型配置尚未保存。');
-		}
-		const currentWrappers = Array.isArray(currentStore['common.settings.answererWrappers'])
-			? currentStore['common.settings.answererWrappers']
-			: [];
-		const managedNames = new Set(['OCS 内置题库', 'ZError API题库']);
-		const wrappers = currentWrappers.filter((wrapper: any) => !managedNames.has(wrapper?.name));
-		wrappers.unshift(createOcsQuestionBankAnswererWrapper(`http://localhost:${Number(store.server.port) || 15319}`));
-		if (wrappers.length > 10) throw new Error('OCS 题库配置最多支持 10 个，请先移除不需要的配置。');
-		const updatedStore = { ...currentStore };
-		updatedStore['common.settings.answererWrappers'] = wrappers;
-		updatedStore['common.settings.disabledAnswererWrapperNames'] = (
-			Array.isArray(currentStore['common.settings.disabledAnswererWrapperNames'])
-				? currentStore['common.settings.disabledAnswererWrapperNames']
-				: []
-		).filter((name: string) => !managedNames.has(name));
-
 		settings.value = await remote.methods.call('saveQuestionBankConfig', settings.value);
 		modelSettingsSaved = true;
-		store.render.setting.ocs.store = updatedStore;
-		store.render.setting.ocs.openSync = true;
-		const shouldEncrypt = remote.methods.callSync('isEncryptionAvailable');
-		await remote.methods.call('saveStore', JSON.stringify(store), shouldEncrypt);
+		await connectQuestionBank();
 		ocsSaveState.value = 'success';
-		ocsSaveMessage.value = '已保存并接入 OCS，浏览器同步已开启';
+		ocsSaveMessage.value = '已保存并接入 OCS，课程脚本将自动同步';
 		Message.success('模型已保存，自动答题会使用该模型。');
 	} catch (error) {
 		ocsSaveState.value = 'error';
@@ -403,6 +478,13 @@ onActivated(() => {
 </script>
 
 <style scoped lang="less">
+.model-picker {
+	display: flex;
+	gap: 8px;
+	width: 100%;
+	> :first-child { flex: 1; min-width: 0; }
+}
+.model-fetch-feedback { margin: -6px 0 16px; }
 .question-bank {
 	height: 100%;
 	min-width: 0;
