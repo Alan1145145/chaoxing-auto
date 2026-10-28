@@ -20,13 +20,15 @@
 | E2 | [V] 14 项：真实 Electron HTTP 下载器与 SHA512 校验；损坏文件、503 和降级阻断；保存握手错误窗口/ID、超时、监听清理 | scripts/test-update-transport.cjs |
 | E3 | [V] 最终包 8 项界面 IPC：760×440 顶部按钮不覆盖系统按钮；手动检查、稍后、取消/重试、进度、关闭 WebView、保存测试设置，再请求静默安装和重启 | scripts/test-update-ui.cjs |
 | E4 | [V] web vue-tsc/Vite、app TypeScript 通过；原浏览器 25 项、模型同步 24 项、布局 17 项、异常回归 6 项通过；原重进浏览器 8 次及延迟回复断言通过。最终包再次通过更新 UI 和浏览器重进回归 | docs/auto-update-1.0.5/*.log（仅本机） |
-| E5 | [T] GitHub 更新清单、资产摘要及真实公共源检查待发布后补记 | scripts/release-github.cjs / scripts/test-update-release.cjs |
+| E5 | [V] 发布命令实际执行成功，4 个资产的远端大小/SHA256 均匹配后才发布；真实 GitHub 源验证：模拟旧客户端识别 1.0.5 为 available，1.0.5 客户端识别 current，检查过程不下载安装包 | scripts/release-github.cjs / scripts/test-update-release.cjs |
 
 ## 源码、风险与回退
 
 修改前文件在本机 before/ 保留；根 package.json 的基线从已发布提交 bffd053615798434d15a223fe0b405500a322e96 读取补存。原 1.0.4 安装包与构建保留。新模块拆分为状态机、Electron 适配层、界面和发布工具，无新增用户数据清理流程。
 
-[V] NSIS 1.0.5 已构建，安装包 285234800 字节，SHA256 `709422a91d6b702d6d7b7050764d1e63791bbf0bb6a07746f55ab9454f016670`。本地发布校验通过，147 个打包 public/lib 文件与编译产物逐字节一致，包内 electron-updater=6.6.2，resources/elevate.exe 与固定仓库 app-update.yml 均存在。GitHub 发布摘要待发布后补记。
+[V] NSIS 1.0.5 已构建，安装包 285234800 字节，SHA256 `709422a91d6b702d6d7b7050764d1e63791bbf0bb6a07746f55ab9454f016670`。本地发布校验通过，147 个打包 public/lib 文件与编译产物逐字节一致，包内 electron-updater=6.6.2，resources/elevate.exe 与固定仓库 app-update.yml 均存在。
+
+[V] [v1.0.5](https://github.com/Alan1145145/chaoxing-auto/releases/tag/v1.0.5) 已正式发布并设为最新，源码提交及标签指向 `fe8aad1aea67e1a91f76011046b74c7901f1aace`，32 个源码文件的远端 blob 摘要已核对。发布命令实际上传安装包、blockmap、SHA256SUMS.txt、latest.yml，所有资产状态为 uploaded，安装包远端摘要与上述本地值一致。原仓库为 public，客户端不需要 GitHub 登录或 token。最终公开源验证已执行通过。
 
 此轮自行审查，无外部评审或用户验收记录。安装调用在测试中由记录器代替，实际 NSIS 安装和 Windows 权限提示未执行，以免修改当前电脑的安装注册信息和快捷方式；不能将这些测试描述为实际安装成功。非 Windows / 开发环境提供安装版提示。未实测所有课程网站与网络环境。
 
