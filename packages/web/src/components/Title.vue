@@ -56,6 +56,7 @@
 				<a-doption @click="allNotify"> <Icon type="campaign">查看公告</Icon> </a-doption>
 
 				<a-doption @click="showVersionInfo"> <Icon type="notes">版本信息</Icon> </a-doption>
+				<a-doption @click="openAppUpdate"> <Icon type="system_update">检查更新</Icon> </a-doption>
 
 				<a-doption @click="router.push('/about')"> <Icon type="info">关于软件</Icon> </a-doption>
 				<TitleLink url="https://github.com/ocsjs/ocs-desktop">
@@ -77,6 +78,7 @@
 			{{ isSimpleMode ? '专业模式' : '简洁模式' }}
 		</span>
 
+		<button class="title-item update-entry" type="button" @click="openAppUpdate">{{ appUpdateState.phase === 'downloading' ? `更新 ${Math.floor(appUpdateState.percent)}%` : appUpdateState.version ? '发现新版本' : '检查更新' }}</button>
 		<StatusBar />
 	</div>
 </template>
@@ -97,6 +99,7 @@ import { Browser } from '../fs/browser';
 import { checkBrowserCaches } from '../utils/browser';
 import Icon from './Icon.vue';
 import StatusBar from './StatusBar.vue';
+import { appUpdateState, openAppUpdate } from '../composables/useAppUpdate';
 
 const { shell } = electron;
 
@@ -273,7 +276,7 @@ function openDevTools() {
 	remote.webContents.call('openDevTools');
 }
 
-/** 版本信息：本地显示，不再读取原项目服务器的版本列表（在线更新已关闭） */
+/** 版本信息本地读取；更新检查只使用本项目的 GitHub 发布。 */
 async function showVersionInfo() {
 	let version = '';
 	try {
@@ -288,8 +291,8 @@ async function showVersionInfo() {
 			h('div', { style: { lineHeight: '1.9' } }, [
 				h('div', ['当前版本：', h('b', '超星自动机 ' + (version || '1.0.0'))]),
 				h('div', '基于 OCS Desktop 2.12.0（MIT）修改。'),
-				h('div', '在线更新：已关闭。软件不会自动下载或覆盖安装任何版本（包括原版 OCS Desktop）。'),
-				h('div', '如需更新，请使用超星自动机的新安装包手动安装，安装时会保留现有设置和数据。')
+				h('div', '软件会检查本项目 GitHub 的正式发布。发现新版本后点击更新，即可自动下载、校验并安装重启。'),
+				h('div', '现有设置、题库和登录数据会保留。也可通过「帮助 → 检查更新」手动检查。')
 			])
 	});
 }
@@ -345,6 +348,7 @@ async function showVersionInfo() {
 		display: flex;
 	}
 }
+.update-entry { flex-shrink: 0; border: 0; background: rgb(var(--primary-1)); color: rgb(var(--primary-6)); border-radius: 6px; margin-left: 8px; }
 :deep(.ant-dropdown-menu-item) {
 	font-size: 12px;
 	padding: 2px 24px 2px 12px;

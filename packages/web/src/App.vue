@@ -3,6 +3,7 @@
 		<div class="desktop-shell w-100 h-100" :class="{ 'browser-mode': route.name === 'embedded-browser', 'browser-focus-mode': route.name === 'embedded-browser' && browserFocusMode }">
 			<!-- 全局顶部栏 -->
 			<Title id="title" />
+			<AppUpdateDialog />
 
 			<div class="main-container w-100">
 				<AppNavigation />
@@ -91,6 +92,8 @@ import AppNavigation from './components/AppNavigation.vue';
 import WorkspaceHeader from './components/WorkspaceHeader.vue';
 import { APP_DISPLAY_NAME } from './config/notice';
 import { browserFocusMode } from './composables/useEmbeddedBrowsers';
+import AppUpdateDialog from './components/AppUpdateDialog.vue';
+import { prepareAppUpdate } from './utils/prepare-app-update';
 
 const { ipcRenderer } = electron;
 const route = useRoute();
@@ -212,6 +215,17 @@ onMounted(async () => {
 
 	/** 全局唯一关闭处理 */
 	let isExiting = false;
+	ipcRenderer.on('app-update-prepare', async (_event, requestId: string) => {
+		if (isExiting) { ipcRenderer.send('app-update-prepared', { requestId, ok: false }); return; }
+		isExiting = true;
+		try {
+			await prepareAppUpdate();
+			ipcRenderer.send('app-update-prepared', { requestId, ok: true });
+		} catch (error) {
+			console.error('更新前保存失败', String(error));
+			ipcRenderer.send('app-update-prepared', { requestId, ok: false });
+		} finally { isExiting = false; }
+	});
 	ipcRenderer.on('close', async () => {
 		// 防重入：避免重复点击关闭按钮或 window.close 循环导致并发触发关闭流程、重复弹窗
 		if (isExiting) return;

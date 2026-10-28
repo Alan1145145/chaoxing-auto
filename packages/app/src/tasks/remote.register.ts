@@ -12,7 +12,7 @@ import si from 'systeminformation';
 import { store } from '../store';
 import { exportExcel } from '../utils/index';
 import { readdir, stat } from 'fs/promises';
-import { updateApp } from './updater';
+import { updateApp, getAppUpdateState, checkForAppUpdates, startAppUpdate, cancelAppUpdate } from './updater';
 import { AutomationScripts } from '../scripts';
 import { AutomationScript } from '../scripts/script';
 import { getBrowserMajorVersion, getExtensionPaths } from '../utils/browser';
@@ -136,6 +136,10 @@ const methods = {
 	statisticFolderSize: statisticFolderSize,
 	getPlatform: () => process.platform,
 	updateApp: updateApp,
+	getAppUpdateState,
+	checkForAppUpdates,
+	startAppUpdate,
+	cancelAppUpdate,
 	moveWindowToTop: moveWindowToTop,
 	isEncryptionAvailable: () => {
 		return safeStorage.isEncryptionAvailable();

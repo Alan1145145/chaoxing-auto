@@ -177,3 +177,7 @@ dist/
 /docs/navigation-fix-1.0.4/upload/
 /docs/navigation-fix-1.0.4/*.log
 /docs/model-browser-fixes/*.log
+/docs/auto-update-1.0.5/*-profile*/
+/docs/auto-update-1.0.5/*.log
+/docs/auto-update-1.0.5/*.png
+/docs/auto-update-1.0.5/upload/

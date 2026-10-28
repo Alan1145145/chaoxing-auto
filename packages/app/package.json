@@ -1,6 +1,6 @@
 {
 	"name": "@ocs-desktop/app",
-	"version": "1.0.4",
+	"version": "1.0.5",
 	"description": "desktop for userscript",
 	"main": "./lib/index.js",
 	"types": "./lib/types.d.ts",
@@ -30,6 +30,7 @@
 		"chalk": "4.1.0",
 		"dayjs": "^1.10.7",
 		"electron-store": "^8.0.1",
+		"electron-updater": "6.6.2",
 		"express": "^4.18.1",
 		"glob": "^11.0.2",
 		"keytar": "^7.9.0",

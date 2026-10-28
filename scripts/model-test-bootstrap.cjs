@@ -6,6 +6,7 @@ const appRequire = require('module').createRequire(path.join(appRoot, 'package.j
 const load = (file) => appRequire(`./lib/${file}`);
 app.setPath('userData', process.env.MODEL_TEST_PROFILE);
 app.setAppPath(appRoot);
+if (process.env.MODEL_TEST_UPDATER) app.getVersion = () => appRequire('./package.json').version;
 app.disableHardwareAcceleration();
 if (process.env.MODEL_TEST_PRODUCTION_FLAGS) {
 	for (const flag of ['no-sandbox', 'disable-gpu', 'disable-software-rasterizer', 'disable-gpu-compositing', 'disable-gpu-rasterization', 'disable-gpu-sandbox']) app.commandLine.appendSwitch(flag);
@@ -37,6 +38,25 @@ app
 		await startupServer(15329);
 		const win = createWindow();
 		remoteRegister(win);
+		if (process.env.MODEL_TEST_UPDATER) {
+			const { EventEmitter } = require('events');
+			const fixture = new EventEmitter();
+			fixture.downloads = 0; fixture.installs = [];
+			fixture.checkForUpdates = async () => {
+				fixture.token = { cancelled: false, cancel() { this.cancelled = true; fixture.reject?.(new Error('cancelled')); } };
+				fixture.emit('update-available', { version: '9.9.9', releaseNotes: '本地更新测试：保留设置。' });
+				return { cancellationToken: fixture.token };
+			};
+			fixture.downloadUpdate = async () => {
+				fixture.downloads++;
+				fixture.emit('download-progress', { percent: 50, transferred: 1024, total: 2048 });
+				await new Promise((resolve, reject) => { fixture.complete = resolve; fixture.reject = reject; });
+				fixture.emit('update-downloaded', { version: '9.9.9' }); return ['never-executed.exe'];
+			};
+			fixture.quitAndInstall = (...args) => fixture.installs.push(args);
+			globalThis.__updateFixture = fixture;
+			load('src/tasks/updater').initializeUpdater(win, { driver: fixture });
+		}
 		await win.loadFile(path.join(appRoot, 'public/index.html'));
 		win.show();
 		globalThis.__modelTest = {

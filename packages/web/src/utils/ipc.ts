@@ -24,8 +24,8 @@ export function activeIpcRenderListener() {
 		store.render.browser.currentBrowserUid = uid;
 	});
 
-	// 在线更新已关闭：即使收到“检测到新版本”消息也不再弹出更新确认框，避免用原版 OCS Desktop 覆盖本软件。
+	// 旧 OCS 版本事件不参与更新；新更新器独立连接本项目 GitHub。
 	ipcRenderer.on('detect-new-app-version', (e, new_version: UpdateInformationResource) => {
-		console.log('detect-new-app-version（在线更新已关闭，已忽略）', new_version?.tag);
+		console.log('已忽略旧 OCS 更新事件', new_version?.tag);
 	});
 }

@@ -8,7 +8,7 @@
 	},
 	"productName": "超星自动机",
 	"asar": false,
-	"publish": null,
+	"publish": [{ "provider": "github", "owner": "Alan1145145", "repo": "chaoxing-auto", "private": false, "releaseType": "release" }],
 	"files": ["lib/**/*", "public/**/*", "script.js", "package.json", "vendor/doubao/runtime/doubao-gateway/**/*", "LICENSE", "NOTICE.md"],
 	"copyright": "Copyright © 2021 enncy (OCS Desktop, MIT). Modified by alan34 2026.",
 	"nsis": {
@@ -20,7 +20,7 @@
 	},
 	"win": {
 		"icon": "public/favicon.ico",
-		"artifactName": "超星自动机-${version}-安装包-${arch}.${ext}",
+		"artifactName": "chaoxing-auto-${version}-setup-${arch}.${ext}",
 		"target": [
 			{
 				"target": "nsis"

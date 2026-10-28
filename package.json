@@ -9,6 +9,7 @@
 	],
 	"scripts": {
 		"build:doubao": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-doubao.ps1",
+		"release:github": "node scripts/release-github.cjs",
 		"build": "pnpm chrome:ensure && pnpm tsc && gulp -f ./scripts/build-app.js",
 		"build:ocsjs": "pnpm --dir packages/ocsjs run build:desktop",
 		"chrome:install": "pnpm exec gulp -f scripts/chrome.install.js",

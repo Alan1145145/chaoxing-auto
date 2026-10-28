@@ -10,6 +10,7 @@ import { startupServer } from './src/tasks/startup.server';
 import { initChrome } from './src/tasks/init.chrome';
 import { store } from './src/store';
 import { initAesKey } from './src/crypto';
+import { initializeUpdater, isInstallingUpdate, startUpdateChecks } from './src/tasks/updater';
 
 app.setName('ocs');
 
@@ -59,6 +60,7 @@ function bootstrap() {
 				}
 
 				app.on('quit', (e) => {
+					if (isInstallingUpdate()) return;
 					e.preventDefault();
 					// 交给渲染层去关闭浏览器
 					if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
@@ -67,13 +69,14 @@ function bootstrap() {
 				});
 
 				window.on('close', (e) => {
+					if (isInstallingUpdate()) return;
 					e.preventDefault();
 					if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
 						window.webContents.send('close');
 					}
 				});
 
-				// 在线更新已关闭：不再在启动后连接原项目服务器检查/下载新版本（见 src/tasks/updater.ts）。
+				initializeUpdater(window);
 
 				task('初始化远程通信模块', () => remoteRegister(window));
 				task('注册app事件监听器', () => globalListenerRegister(window));
@@ -86,6 +89,7 @@ function bootstrap() {
 
 				// 加载完成显示，解决一系列的显示/黑屏问题
 				window.show();
+				startUpdateChecks(window);
 			})
 		])
 	);
