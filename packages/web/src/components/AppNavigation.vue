@@ -1,7 +1,7 @@
 <template>
 	<nav
 		class="app-navigation"
-		:class="{ compact: !store.render.setting.showSideBarText }"
+		:class="{ compact: isCompact }"
 		aria-label="主导航"
 	>
 		<button
@@ -27,7 +27,7 @@
 				:size="21"
 				theme="outlined"
 			/>
-			<span v-if="store.render.setting.showSideBarText">{{ item.meta.title }}</span>
+			<span v-if="!isCompact">{{ item.meta.title }}</span>
 		</button>
 		<div class="nav-bottom"><i />本地工作空间<small>CHAOXING · AUTO</small></div>
 	</nav>
@@ -44,6 +44,7 @@ import Icon from './Icon.vue';
 
 const router = useRouter();
 const currentRoute = router.currentRoute;
+const isCompact = computed(() => !store.render.setting.showSideBarText || currentRoute.value.name === 'embedded-browser');
 const menuRoutes = computed(() =>
 	((routes.find((item) => item.name === 'index')?.children || []) as CustomRouteType[]).filter(
 		(item) => !item.meta?.hideInMenu

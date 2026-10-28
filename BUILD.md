@@ -82,6 +82,7 @@ node scripts/test-model-sync.cjs
 pnpm exec electron scripts/test-model-capabilities.cjs
 node scripts/test-browser-interactions.cjs
 node scripts/test-audit-regressions.cjs
+node scripts/test-ui-layout.cjs
 pnpm exec electron scripts/test-model-response-errors.cjs
 ```
 

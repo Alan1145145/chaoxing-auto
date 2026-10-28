@@ -171,3 +171,5 @@ dist/
 /docs/model-browser-fixes/upload/
 
 /docs/audit-1.0.3/upload/
+
+/docs/**/before-ui/

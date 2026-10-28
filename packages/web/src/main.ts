@@ -13,6 +13,7 @@ import './assets/less/arco-custom.less';
 import './assets/css/dew-theme.css';
 import './assets/css/motion.css';
 import './assets/css/workspace-surfaces.css';
+import './assets/css/layout-polish.css';
 import { installInteractionFeedback } from './utils/interaction-feedback';
 installInteractionFeedback();
 import { inBrowser } from './utils/node';

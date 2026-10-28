@@ -1,15 +1,16 @@
 // @ts-check
-import { app, BrowserWindow, Menu, shell } from 'electron';
+import { app, BrowserWindow, Menu, screen, shell } from 'electron';
 import path from 'path';
 
 export function createWindow() {
+	const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workAreaSize;
 	const win = new BrowserWindow({
 		title: '超星自动机',
 		icon: path.join(app.getAppPath(), 'public/favicon.ico'),
-		minWidth: 700,
-		minHeight: 400,
-		width: 1360,
-		height: 900,
+		minWidth: Math.min(700, area.width),
+		minHeight: Math.min(400, area.height),
+		width: Math.min(1480, area.width),
+		height: Math.min(960, area.height),
 		center: true,
 		hasShadow: true,
 		autoHideMenuBar: true,

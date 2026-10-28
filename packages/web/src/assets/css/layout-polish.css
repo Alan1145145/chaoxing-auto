@@ -1,0 +1,70 @@
+/* The desktop owns the viewport; pages and dialog bodies own their scrolling. */
+html, body, #app { box-sizing: border-box; overflow: hidden; overscroll-behavior: none; }
+body { --dew-muted: #747d6f; --border-radius-small: 8px; --border-radius-medium: 12px; --border-radius-large: 16px; }
+.desktop-shell .workspace-header { height: 60px; padding: 0 24px; }
+.desktop-shell .workspace-identity small { letter-spacing: .4px; font-size: 11px; }
+.desktop-shell .workspace-switcher a { padding: 7px 16px; font-size: 13px; }
+.desktop-shell .main-container > .app-navigation { width: 88px; flex-basis: 88px; padding: 16px 10px; }
+.desktop-shell .main-container > .app-navigation.compact { width: 64px; flex-basis: 64px; padding: 12px 8px; }
+.desktop-shell .app-navigation button { padding: 10px 2px; margin-bottom: 4px; border-radius: 12px; font-size: 11px; }
+.desktop-shell .app-navigation .nav-brand { padding: 0; margin-bottom: 20px; }
+.desktop-shell .nav-bottom { padding-top: 20px; }
+.arco-btn-size-medium { border-radius: 10px; font-size: 13px; }
+.arco-input-wrapper, .arco-select-view-single { border-radius: 9px; }
+.question-bank .page-header h2 { font-size: 24px; letter-spacing: -.4px; margin: 2px 0 6px; }
+.question-bank .content-section { padding: 20px !important; }
+.question-bank .provider-grid { margin-top: 20px; gap: 14px; }
+.question-bank .provider-card { padding: 20px; border-radius: 16px; }
+.question-bank .provider-model-id { margin: 18px 0 12px; }
+.question-bank .provider-card small { font-size: 11px; }
+.question-bank .capability-controls { padding: 4px 0; }
+.question-bank .ocs-config-card { padding: 14px 16px; margin: 12px 0; }
+.question-bank .api-endpoint-row { min-height: 40px; }
+.question-bank .page-status { line-height: 1.7; }
+
+/* Arco's inline-block centering shim cannot center a block flex dialog.
+   Use one flex wrapper and disable its full-height pseudo-element. */
+.model-provider-dialog .arco-modal-wrapper {
+ display: flex; align-items: center; justify-content: center;
+ padding: 16px; box-sizing: border-box; overflow: hidden; white-space: normal;
+}
+.model-provider-dialog .arco-modal-wrapper::after { display: none; }
+.model-provider-dialog .model-provider-modal {
+ top: 0; margin: 0; display: flex; flex-direction: column;
+ max-width: 100%; max-height: calc(100dvh - var(--title-height) - 32px);
+ border-radius: 18px !important;
+}
+.model-provider-dialog .arco-modal-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px 24px; }
+.model-provider-dialog .arco-modal-header { padding: 16px 24px; flex-shrink: 0; }
+.model-provider-dialog .arco-modal-title { justify-content: flex-start; font-size: 17px; }
+.model-provider-dialog .arco-modal-footer { padding: 12px 24px; flex-shrink: 0; }
+.model-provider-dialog .arco-form-item { margin-bottom: 18px; }
+.model-provider-dialog .provider-help { font-size: 12px; color: var(--color-text-2); line-height: 1.7; }
+.model-provider-dialog .provider-help summary { cursor: pointer; color: var(--color-text-2); padding: 4px 0; }
+.model-provider-dialog .provider-help > div { padding-top: 8px; overflow-wrap: anywhere; }
+.arco-select-dropdown-list-wrapper { max-height: min(240px, 40dvh) !important; overscroll-behavior: contain; }
+
+.desktop-shell.browser-mode .session-tabs { padding: 4px 8px 0; gap: 4px; }
+.desktop-shell.browser-mode .session-name { padding: 7px 10px; }
+.desktop-shell.browser-mode .session-home { padding: 7px 10px; }
+.desktop-shell.browser-mode .page-tabs { padding-top: 4px; }
+.desktop-shell.browser-mode .page-tabs button { padding-top: 6px; padding-bottom: 6px; }
+.desktop-shell.browser-mode .browser-toolbar { padding: 6px 8px; gap: 6px; margin: 0; border-radius: 0; border-bottom: 1px solid var(--dew-border); }
+.desktop-shell.browser-mode .browser-webview { margin: 0; width: 100%; border-radius: 0; }
+.desktop-shell.browser-mode .browser-progress-track { margin: 0; height: 2px; border-radius: 0; }
+.desktop-shell.browser-focus-mode .app-navigation,
+.desktop-shell.browser-focus-mode .session-tabs { display: none; }
+@media (max-width: 900px) {
+ .desktop-shell .workspace-header { padding: 0 16px; height: 56px; }
+ .desktop-shell .workspace-identity small { display: none; }
+ .question-bank .content-section { padding: 16px !important; }
+ .question-bank .page-header h2 { font-size: 22px; }
+ .desktop-shell.browser-mode .browser-address { min-width: 110px; }
+}
+@media (max-width: 760px) {
+ .desktop-shell .workspace-identity { display: none; }
+ .model-provider-dialog .arco-modal-wrapper { padding: 10px; }
+ .model-provider-dialog .model-provider-modal { max-height: calc(100dvh - var(--title-height) - 20px); }
+ .model-provider-dialog .arco-modal-body { padding: 16px 18px; }
+ .model-provider-dialog .arco-modal-header, .model-provider-dialog .arco-modal-footer { padding-left: 18px; padding-right: 18px; }
+}

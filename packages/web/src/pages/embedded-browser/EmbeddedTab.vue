@@ -21,6 +21,7 @@
 				/></a-button>
 			</a-button-group>
 			<a-button size="small" title="主页" @click="goHome">主页</a-button>
+			<a-button size="small" :aria-pressed="browserFocusMode" @click="browserFocusMode = !browserFocusMode">{{ browserFocusMode ? '退出专注' : '专注浏览' }}</a-button>
 			<a-input
 				v-model="address"
 				class="browser-address"
@@ -114,6 +115,7 @@ import { store } from '../../store';
 import { remote } from '../../utils/remote';
 import { addScriptFromUrl } from '../../utils/user-scripts';
 import { filterScriptsNeedingInstall } from '../../utils/script-version';
+import { browserFocusMode } from '../../composables/useEmbeddedBrowsers';
 
 interface EmbeddedWebview extends HTMLElement {
 	loadURL(url: string): Promise<void>;

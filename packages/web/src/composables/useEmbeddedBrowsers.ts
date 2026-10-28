@@ -1,7 +1,8 @@
-import { reactive } from 'vue';
+import { reactive, ref } from 'vue';
 
 // Runtime instances stay mounted until explicitly closed; never persist guest IDs.
 export const embeddedBrowsers = reactive<string[]>([]);
+export const browserFocusMode = ref(false);
 
 export function openEmbeddedBrowser(uid: string) {
 	if (uid && !embeddedBrowsers.includes(uid)) embeddedBrowsers.push(uid);

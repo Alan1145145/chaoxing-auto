@@ -2,7 +2,7 @@
 	<div class="question-bank">
 		<header class="page-header">
 			<div>
-				<div class="dew-eyebrow">INTELLIGENCE, CONNECTED</div><h2>找到适合你的学习助手。</h2>
+				<div class="dew-eyebrow">模型与答题</div><h2>模型接入</h2>
 				<div class="page-status">选择答题模型。保存后，课程里的自动答题会使用这个模型。</div>
 			</div>
 			<a-button
@@ -40,7 +40,7 @@
 						<div class="setting-label">默认模型</div>
 						<div class="page-status">自动答题使用此模型作答。</div>
 					</div>
-					<a-select
+					<a-select :trigger-props="selectTriggerProps" popup-container="body"
 						:model-value="settings.selectedProviderId || undefined"
 						:options="enabledProviderOptions"
 						:disabled="enabledProviderOptions.length === 0 || savingConfig"
@@ -84,8 +84,10 @@
 			v-model:visible="providerModalVisible"
 			:title="providerEditing ? '编辑模型接入' : '添加模型接入'"
 			:ok-loading="savingProvider"
-			:width="620"
+			:width="680"
 			modal-class="model-provider-modal"
+			class="model-provider-dialog"
+			title-align="start"
 			:on-before-ok="saveProvider"
 		>
 			<a-form
@@ -106,7 +108,7 @@
 						label="接口协议"
 						required
 					>
-						<a-select v-model="providerForm.protocol" @change="changeProviderProtocol">
+						<a-select :trigger-props="selectTriggerProps" popup-container="body" v-model="providerForm.protocol" @change="changeProviderProtocol">
 							<a-option value="openai-chat">OpenAI 兼容</a-option>
 							<a-option value="anthropic">Anthropic Messages</a-option>
 							<a-option value="gemini">Google Gemini</a-option>
@@ -122,12 +124,25 @@
 						:placeholder="baseUrlPlaceholder"
 					/>
 				</a-form-item>
+				<a-form-item label="API Key">
+					<a-input-password
+						v-model="providerForm.apiKey"
+						:placeholder="providerForm.hasApiKey ? '留空以保留已保存的密钥' : '输入 API Key'"
+					/>
+					<a-checkbox
+						v-if="providerForm.hasApiKey"
+						v-model="providerForm.clearApiKey"
+						class="clear-key"
+					>
+						清除已保存的密钥
+					</a-checkbox>
+				</a-form-item>
 				<a-form-item
 					label="模型 ID"
 					required
 				>
 					<div class="model-picker">
-						<a-select
+						<a-select :trigger-props="selectTriggerProps" popup-container="body"
 							v-if="availableModels.length"
 							v-model="providerForm.model"
 							:options="modelOptions"
@@ -145,21 +160,9 @@
 				<div v-else-if="availableModels.length" class="page-status model-fetch-feedback">
 					已获取 {{ availableModels.length }} 个模型，可搜索选择，也可手动输入模型 ID。
 				</div>
-				<a-form-item label="API Key">
-					<a-input-password
-						v-model="providerForm.apiKey"
-						:placeholder="providerForm.hasApiKey ? '留空以保留已保存的密钥' : '输入 API Key'"
-					/>
-					<a-checkbox
-						v-if="providerForm.hasApiKey"
-						v-model="providerForm.clearApiKey"
-						class="clear-key"
-					>
-						清除已保存的密钥
-					</a-checkbox>
-				</a-form-item>
+
 				<a-form-item v-if="providerForm.protocol === 'openai-chat'" label="能力适配">
-					<a-select v-model="providerForm.capabilityPreset" :options="capabilityOptions" />
+					<a-select :trigger-props="selectTriggerProps" popup-container="body" v-model="providerForm.capabilityPreset" :options="capabilityOptions" />
 				</a-form-item>
 				<a-form-item label="模型能力">
 					<a-space wrap>
@@ -172,6 +175,7 @@
 					<span class="inline-label">启用该模型</span>
 					<a-button style="margin-left: auto" :loading="testingProviderId === providerForm.id" @click="testProvider(providerForm)">测试连接</a-button>
 				</a-form-item>
+				<details class="provider-help"><summary>服务地址与密钥说明</summary>
 				<div
 					v-if="providerForm.id === QWEN_PROVIDER_ID"
 					class="page-status"
@@ -197,6 +201,7 @@
 				>
 					填写服务地址和 API Key 后，点击「一键获取模型」选择模型；也可手动填写模型 ID。点击确定即可保存并自动接入 OCS JS。
 				</div>
+				</details>
 			</a-form>
 		</a-modal>
 	</div>
@@ -234,6 +239,7 @@ const emptyProvider = (): ProviderForm => ({
 	reasoningEnabled: false, webSearchEnabled: false, capabilityPreset: 'auto'
 });
 
+const selectTriggerProps = { autoFitPosition: true, updateAtScroll: true };
 const capabilityOptions = [
 	{ label: '自动识别', value: 'auto' }, { label: 'OpenAI（联网使用 Responses）', value: 'openai' },
 	{ label: '通义千问', value: 'qwen' }, { label: 'DeepSeek', value: 'deepseek' },

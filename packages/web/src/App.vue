@@ -1,13 +1,13 @@
 <template>
 	<a-config-provider :locale="zhCN">
-		<div class="desktop-shell w-100 h-100">
+		<div class="desktop-shell w-100 h-100" :class="{ 'browser-mode': route.name === 'embedded-browser', 'browser-focus-mode': route.name === 'embedded-browser' && browserFocusMode }">
 			<!-- 全局顶部栏 -->
 			<Title id="title" />
 
 			<div class="main-container w-100">
 				<AppNavigation />
 				<div class="workspace-main">
-					<WorkspaceHeader />
+					<WorkspaceHeader v-if="route.name !== 'embedded-browser'" />
 					<EmbeddedWorkspace>
 						<!-- 内容区域 -->
 						<router-view v-slot="{ Component }">
@@ -90,6 +90,7 @@ import EmbeddedWorkspace from './components/EmbeddedWorkspace.vue';
 import AppNavigation from './components/AppNavigation.vue';
 import WorkspaceHeader from './components/WorkspaceHeader.vue';
 import { APP_DISPLAY_NAME } from './config/notice';
+import { browserFocusMode } from './composables/useEmbeddedBrowsers';
 
 const { ipcRenderer } = electron;
 const route = useRoute();
