@@ -173,3 +173,7 @@ dist/
 /docs/audit-1.0.3/upload/
 
 /docs/**/before-ui/
+
+/docs/navigation-fix-1.0.4/upload/
+/docs/navigation-fix-1.0.4/*.log
+/docs/model-browser-fixes/*.log

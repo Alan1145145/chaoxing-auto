@@ -7,6 +7,9 @@ const load = (file) => appRequire(`./lib/${file}`);
 app.setPath('userData', process.env.MODEL_TEST_PROFILE);
 app.setAppPath(appRoot);
 app.disableHardwareAcceleration();
+if (process.env.MODEL_TEST_PRODUCTION_FLAGS) {
+	for (const flag of ['no-sandbox', 'disable-gpu', 'disable-software-rasterizer', 'disable-gpu-compositing', 'disable-gpu-rasterization', 'disable-gpu-sandbox']) app.commandLine.appendSwitch(flag);
+}
 app.setLoginItemSettings = () => {};
 
 app

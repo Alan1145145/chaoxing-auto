@@ -34,6 +34,8 @@
 		</div>
 		<div
 			v-show="!activeBrowserUid"
+			ref="workspaceRoute"
+			tabindex="-1"
 			class="workspace-route"
 		>
 			<slot />
@@ -49,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { router } from '../route';
 import { store } from '../store';
 import { Browser } from '../fs/browser';
@@ -59,6 +61,12 @@ import EmbeddedBrowser from '../pages/embedded-browser/index.vue';
 const activeBrowserUid = computed(() =>
 	router.currentRoute.value.name === 'embedded-browser' ? String(router.currentRoute.value.params.uid || '') : ''
 );
+const workspaceRoute = ref<HTMLElement>();
+watch(activeBrowserUid, async (uid, previousUid) => {
+	if (uid || !previousUid) return;
+	await nextTick();
+	if (!activeBrowserUid.value) workspaceRoute.value?.focus({ preventScroll: true });
+}, { flush: 'post' });
 watch(
 	activeBrowserUid,
 	(uid) => {
@@ -85,6 +93,7 @@ watch(
 	overflow: auto;
 	overscroll-behavior: contain;
 }
+.workspace-route:focus { outline: none; }
 .workspace-guest {
 	flex: 1;
 	height: 0 !important;

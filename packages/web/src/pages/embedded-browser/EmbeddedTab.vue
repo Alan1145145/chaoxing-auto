@@ -153,14 +153,17 @@ const startUrl = computed(
 	() => props.initialUrl || homeUrl.value
 );
 const homeUrl = computed(() => `http://localhost:${store.server.port || 15319}/start.html?uid=${encodeURIComponent(browserUid.value)}`);
-watch(() => props.active, async (active) => {
-	const id = getWebContentsId();
-	if (active && id !== undefined) {
-		addressEditing.value = false;
-		await remote.methods.call('registerEmbeddedWebContents', browserUid.value, id, true);
-		webviewRef.value?.focus();
-	}
-});
+watch(() => props.active, (active) => {
+	addressEditing.value = false;
+	const id = registeredWebContentsId;
+	if (!active || id === undefined) return;
+	// Re-entry only updates the active tab registry. A delayed reply must not
+	// focus a guest that has since been hidden or interrupt a host button/input.
+	// Use the ready ID rather than synchronous WebView IPC during a route swap.
+	void remote.methods.call('registerEmbeddedWebContents', browserUid.value, id, true).catch((error) => {
+		if (props.active && registeredWebContentsId === id) Message.error(`浏览器切换失败：${String(error)}`);
+	});
+}, { flush: 'post' });
 const canGoBack = ref(false);
 const canGoForward = ref(false);
 
