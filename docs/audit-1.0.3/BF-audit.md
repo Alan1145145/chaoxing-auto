@@ -17,7 +17,7 @@
 - [V] 新增 `scripts/test-audit-regressions.cjs` 6 项真实 Electron 异常路径、`scripts/test-model-response-errors.cjs` 16 个响应 fixtures 通过。
 - [V] NSIS 1.0.3 已构建，关键打包模块与编译文件逐个一致；新安装程序未执行实际安装。
 - [V] 打包资源回归：新增异常路径 6 项、模型界面/同步 24 项、浏览器交互 25 项、响应 fixtures 16 项均通过。
-- [T] GitHub 提交及发布结果在交付前补记。
+- [V] 源码审查修复提交 `4fd5edf6620d4d4500eae126b4724c2428c1c6a3`，UI 修复提交/发布标签 `684bb2e4fdcc1911d382b65ae48ff212fa1511b5`。
 
 官方响应依据：[OpenAI finish_reason](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)、[Claude stop_reason](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons)、[Gemini finishReason](https://ai.google.dev/api/generate-content)。使用现有 Electron、Playwright、Axios、TypeScript，未新增依赖。
 
@@ -25,7 +25,7 @@
 
 本轮为自行审查，无外部评审或用户验收记录。测试使用本地模拟服务和隔离配置；不代表全部课程网站和付费模型实测。异常响应会明确报错而不自动继续工具调用，避免把未完成内容当成答案。未删除或修改用户已有题库。缓存合并写入、正常退出刷盘及原有窗口/弹窗限制与 1.0.2 相同。
 
-源码差异均保留本地 before/；当前目录没有 .git。发布前记录实际 GitHub 提交与安装包摘要。回退可运行 `packages/app/dist-browser-fixes-20261028/win-unpacked/超星自动机.exe` 或下载 v1.0.2。新启动脚本指向 `packages/app/dist-audit-20261028/win-unpacked/超星自动机.exe`。
+源码差异均保留本地 before/；当前目录没有 .git。实际 GitHub 提交与最终安装包摘要已在本记录补记。回退可运行 `packages/app/dist-browser-fixes-20261028/win-unpacked/超星自动机.exe` 或下载 v1.0.2。新启动脚本指向 `packages/app/dist-audit-20261028/win-unpacked/超星自动机.exe`。
 
 
 附带修正：能力回归的旧版磁盘对比仅在本地存在 1.0.1 构建时执行；全新源码 checkout 缺少忽略的旧版构建时不再因此报模块不存在。
@@ -37,4 +37,5 @@
 - [V] 相同 1360×800 宿主，网页高度从 496.4px 提升至普通模式 641.6px、专注模式 683.6px；专注模式网页宽度为完整 1360px。去掉重复页头和网页四周空白，浏览状态侧栏自动紧凑，专注模式隐藏侧栏/浏览器分组栏。
 - [V] 统一侧栏、按钮、表单和卡片间距，提高辅助文字对比度。模型弹窗按“地址/密钥 → 获取模型 → 能力”排序，将详细说明折叠；下拉跟随表单滚动并自动适应视口。原有 24/25 项界面/浏览器回归继续通过，截图已人工查看。
 - [V] 初始窗口尺寸按当前显示器可用区域调整，避免超出小屏工作区。
-- [T] 含 UI 改动的最终安装包校验与 GitHub 发布待补记。
+- [V] 最终包的布局 17 项、异常路径 6 项、模型同步 24 项、浏览器 25 项、响应 16 项均通过。模拟缺少本地旧版构建时，能力测试 1048 项通过；存在基线时 1050 项通过。
+- [V] GitHub [v1.0.3](https://github.com/Alan1145145/chaoxing-auto/releases/tag/v1.0.3) 已发布，远端大小 284877713 字节、SHA256 `8bedf2216b3b86c357ea8c7e70cc806570f79261d0387bf0ebb577ee911cf4cf` 与本地一致；校验文件同步上传。
