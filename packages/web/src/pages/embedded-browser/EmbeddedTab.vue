@@ -358,7 +358,11 @@ async function syncScripts(onStartup = false) {
 
 		const unsupportedScripts = enabledScripts.filter((script) => !isOcsScript(script));
 		if (unsupportedScripts.length) {
-			Message.warning('內嵌模式已載入 OCSJS；其他用户脚本暂不由内嵌运行器执行。');
+			Message.warning(
+				`内嵌模式已加载 OCSJS（学习强国等内置脚本已含在内）；以下用户脚本不由内嵌模式代跑：${unsupportedScripts
+					.map((script) => script.info?.name || '未命名脚本')
+					.join('、')}。如需执行，请在浏览器内的脚本管理器中启用。`
+			);
 		} else if (!onStartup) {
 			Message.success(`OCSJS ${result.version ? `v${result.version} ` : ''}已加载。`);
 		}
