@@ -1101,7 +1101,7 @@ export const BackgroundProject = Project.create({
 						};
 					}
 
-					return gmRequest.apply(this, [details as any]);
+					return gmRequest(details as any);
 				};
 				// @ts-ignore
 				fetch = (input: URL | RequestInfo, init?: RequestInit | undefined) => {
@@ -1119,7 +1119,9 @@ export const BackgroundProject = Project.create({
 							time: Date.now()
 						};
 						addRecord(data);
-						const res = originalFetch.apply(this, [input, init]);
+						// fetch 必须以 window 作为调用者，否则浏览器抛 Illegal invocation，
+						// U校园等依赖 fetch 加载课程内容的站点会因此白屏。
+						const res = originalFetch.call(window, input, init);
 						res
 							.then((result) => {
 								return result.clone().text();
@@ -1137,7 +1139,7 @@ export const BackgroundProject = Project.create({
 						});
 						return res;
 					} else {
-						return originalFetch.apply(this, [input, init]);
+						return originalFetch.call(window, input, init);
 					}
 				};
 			}

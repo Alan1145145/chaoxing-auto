@@ -5,6 +5,9 @@ package-lock.json
 public/
 bin/
 tests/
+# electron-builder 输出与 PyInstaller 生成的豆包网关运行时
+dist-release-*/
+vendor/doubao/runtime/
 
 # rollup-plugin-visualizer
 stats.html

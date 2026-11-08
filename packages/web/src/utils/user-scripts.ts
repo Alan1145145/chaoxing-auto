@@ -134,3 +134,110 @@ export function openScriptSource(script: StoreUserScript) {
 		}
 	}
 }
+
+type BuiltinUserScript = {
+	/** 本地服务器路径，用于识别和更新旧条目 */
+	path: string;
+	name: string;
+	version: string;
+	description: string;
+	license: string;
+	author: string;
+};
+
+/**
+ * 随软件内置的用户脚本。
+ * 外部 Chrome 走「用户脚本工具箱 → 启动时自动安装到脚本管理器」这条链路，
+ * 因此 OCS 与 U校园刷课助手都必须在这里预置，否则浏览器里不会有任何脚本。
+ */
+const BUILTIN_USERSCRIPTS: BuiltinUserScript[] = [
+	{
+		path: '/api/embedded-ocsjs.user.js',
+		name: 'OCS 网课助手',
+		version: '5.1.3',
+		description: 'OCS 网课助手（本地构建，含学习强国、超星等平台脚本）',
+		license: 'MIT',
+		author: 'enncy'
+	}
+];
+
+/**
+ * 确保内置脚本在「我的脚本」列表中，并把地址更新为当前本地服务器端口。
+ * 这样浏览器启动时脚本管理器会自动安装/更新它们。
+ */
+export async function ensureBuiltinUserScripts() {
+	const port = Number(store.server.port) || 15319;
+	const scripts = store.render.scripts;
+	let changed = false;
+	for (const builtin of BUILTIN_USERSCRIPTS) {
+		const url = `http://127.0.0.1:${port}${builtin.path}`;
+		const existing = scripts.find(
+			(script) =>
+				(script.url || '').includes(builtin.path) ||
+				(script.info?.code_url || '').includes(builtin.path) ||
+				(builtin.path.includes('ocsjs') && /ocs\.user\.js(\?|$)/.test(script.url || ''))
+		);
+		if (existing) {
+			if (existing.url !== url) {
+				existing.url = url;
+				changed = true;
+			}
+			if (existing.info && existing.info.code_url !== url) {
+				existing.info.code_url = url;
+				existing.info.url = url;
+				changed = true;
+			}
+			if (existing.info) {
+				if (existing.info.version !== builtin.version) {
+					existing.info.version = builtin.version;
+					changed = true;
+				}
+				if (existing.info.name !== builtin.name) {
+					existing.info.name = builtin.name;
+					changed = true;
+				}
+			}
+			if (existing.enable !== true) {
+				existing.enable = true;
+				changed = true;
+			}
+			continue;
+		}
+		const id = Date.now() + Math.floor(Math.random() * 1000);
+		scripts.push({
+			id,
+			url,
+			enable: true,
+			isLocalScript: false,
+			isInternetLinkScript: true,
+			info: {
+				id,
+				url,
+				code_url: url,
+				name: builtin.name,
+				version: builtin.version,
+				description: builtin.description,
+				license: builtin.license,
+				authors: [{ name: builtin.author, url: '' }],
+				ratings: 0,
+				daily_installs: 0,
+				total_installs: 0,
+				create_time: Date.now(),
+				update_time: Date.now()
+			}
+		});
+		changed = true;
+	}
+	if (changed) {
+		try {
+			await remote.methods.call(
+				'saveStore',
+				JSON.stringify(store),
+				remote.methods.callSync('isEncryptionAvailable')
+			);
+		} catch (error) {
+			console.warn('保存内置脚本列表失败', error);
+		}
+	}
+	return changed;
+}

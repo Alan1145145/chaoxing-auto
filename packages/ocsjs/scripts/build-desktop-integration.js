@@ -17,7 +17,15 @@ function run(command, cwd, env = {}) {
 }
 
 function createBuildOptions(ocs, cssPath, outputPath) {
-	const projectList = [ocs.CXProject, ocs.ZHSProject, ocs.ZJYProject, ocs.IcveMoocProject, ocs.ICourseProject, ocs.YKTProject]
+	const projectList = [
+		ocs.CXProject,
+		ocs.ZHSProject,
+		ocs.ZJYProject,
+		ocs.IcveMoocProject,
+		ocs.ICourseProject,
+		ocs.YKTProject,
+		ocs.XuexiProject
+	]
 		.map((project) => `【${project.name}】`)
 		.join(' ');
 	const match = Array.from(

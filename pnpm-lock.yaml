@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  easy-us@1.0.15:
+    hash: c9cc7a5861e96f98e75f5cf553d1c512afea19b44cb7a890f477b068a44b9baf
+    path: patches/easy-us@1.0.15.patch
+
 importers:
 
   .:
@@ -262,7 +267,7 @@ importers:
     dependencies:
       easy-us:
         specifier: ^1.0.15
-        version: 1.0.15(rollup@2.80.0)(tslib@2.8.1)(typescript@4.9.5)
+        version: 1.0.15(patch_hash=c9cc7a5861e96f98e75f5cf553d1c512afea19b44cb7a890f477b068a44b9baf)(rollup@2.80.0)(tslib@2.8.1)(typescript@4.9.5)
       events:
         specifier: ^3.3.0
         version: 3.3.0
@@ -323,7 +328,7 @@ importers:
         version: 3.4.16
       easy-us:
         specifier: ^1.0.15
-        version: 1.0.15(rollup@2.80.0)(tslib@2.8.1)(typescript@4.9.5)
+        version: 1.0.15(patch_hash=c9cc7a5861e96f98e75f5cf553d1c512afea19b44cb7a890f477b068a44b9baf)(rollup@2.80.0)(tslib@2.8.1)(typescript@4.9.5)
       lodash:
         specifier: ^4.17.21
         version: 4.18.1
@@ -406,7 +411,7 @@ importers:
         version: 1.11.20
       easy-us:
         specifier: ^1.0.15
-        version: 1.0.15(rollup@2.80.0)(tslib@2.8.1)(typescript@4.9.5)
+        version: 1.0.15(patch_hash=c9cc7a5861e96f98e75f5cf553d1c512afea19b44cb7a890f477b068a44b9baf)(rollup@2.80.0)(tslib@2.8.1)(typescript@4.9.5)
       events:
         specifier: ^3.3.0
         version: 3.3.0
@@ -3290,12 +3295,12 @@ packages:
 
   glob@7.2.3:
     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
-    deprecated: Glob versions prior to v9 are no longer supported
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   glob@8.1.0:
     resolution: {integrity: sha512-r8hpEjiQEYlF2QU0df3dS+nxxSIreXQS1qRhMJM0Q5NDdR386C7jb7Hwwod8Fgiuex+k0GFjgft18yvxm5XoCQ==}
     engines: {node: '>=12'}
-    deprecated: Glob versions prior to v9 are no longer supported
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   global-agent@3.0.0:
     resolution: {integrity: sha512-PT6XReJ+D07JvGoxQMkT6qji/jVNfX/h364XHZOWeRzy64sSFr+xJ5OX7LI3b4MPQzdL4H8Y8M0xzPpsVMwA8Q==}
@@ -3513,6 +3518,7 @@ packages:
   image-size@0.5.5:
     resolution: {integrity: sha512-6TDAlDPZxUFCv+fuOkIoXT/V/f3Qbq8e37p+YOiYrUv3v9cc3/6x78VdfPgFVaB9dZYeLUfKgHRebpkm/oP2VQ==}
     engines: {node: '>=0.10.0'}
+    deprecated: Please migrate to image-size@2.x
     hasBin: true
 
   import-fresh@3.3.1:
@@ -5752,7 +5758,7 @@ packages:
 
   uuid@3.4.0:
     resolution: {integrity: sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==}
-    deprecated: Please upgrade  to version 7 or higher.  Older versions may use Math.random() in certain circumstances, which is known to be problematic.  See https://v8.dev/blog/math-random for details.
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   v8-compile-cache@2.4.0:
@@ -5936,6 +5942,7 @@ packages:
 
   whatwg-encoding@1.0.5:
     resolution: {integrity: sha512-b5lim54JOPN9HtzvK9HFXvBma/rnfFeqsic0hSpjtDbVxR3dJKLc+KB4V6GgiGOvl7CY/KNh8rxSo9DKQrnUEw==}
+    deprecated: Use @exodus/bytes instead for a more spec-conformant and faster implementation
 
   whatwg-mimetype@2.3.0:
     resolution: {integrity: sha512-M4yMwr6mAnQz76TbJm914+gPpB/nCwvZbJU28cUD6dR004SAxDLOOSUaB1JDRqLtaOV/vi0IC5lEAGFgrjGv/g==}
@@ -8150,7 +8157,7 @@ snapshots:
       is-plain-object: 2.0.4
       object.defaults: 1.1.0
 
-  easy-us@1.0.15(rollup@2.80.0)(tslib@2.8.1)(typescript@4.9.5):
+  easy-us@1.0.15(patch_hash=c9cc7a5861e96f98e75f5cf553d1c512afea19b44cb7a890f477b068a44b9baf)(rollup@2.80.0)(tslib@2.8.1)(typescript@4.9.5):
     dependencies:
       '@rollup/plugin-typescript': 11.1.6(rollup@2.80.0)(tslib@2.8.1)(typescript@4.9.5)
       events: 3.3.0

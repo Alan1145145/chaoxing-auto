@@ -1,4 +1,5 @@
 import express from 'express';
+import { app as electronApp } from 'electron';
 import { Logger } from '../logger';
 import path from 'path';
 import fs from 'fs';
@@ -10,6 +11,7 @@ import { canOCR, det, ocr } from '../utils/ocr';
 import { randomUUID } from 'crypto';
 import { executeEmbeddedBrowserAction, findEmbeddedWebContents } from '../utils/embedded-browser';
 import { getQuestionBankStatus, queryQuestionBank } from '../services/question-bank';
+import { handleLocalAiChat, handleLocalAiDoubao, buildLocalAiHealth, isLoopbackAddress } from '../services/local-ai';
 import { performEmbeddedStorageByToken } from '../utils/embedded-storage';
 const logger = Logger('server');
 
@@ -467,6 +469,8 @@ export async function startupServer(port = 15319) {
 		res.sendFile(metaPath);
 	});
 
+	/** U校园刷课助手：外部 Chrome 的脚本管理器也从这个地址安装。 */
+
 	// 提供本地用户脚本（扩展只能拦截 http/https 请求安装脚本）
 	app.get('/api/local-userscript', (req, res) => {
 		const requestedPath = typeof req.query.path === 'string' ? path.resolve(req.query.path) : '';
@@ -498,6 +502,43 @@ export async function startupServer(port = 15319) {
 		} catch {
 			res.status(404).send('File not found');
 		}
+	});
+
+	/** 内嵌脚本（U校园刷课助手）调用本地模型，复用「模型接入」里选中的模型（默认内置豆包）。 */
+	app.post('/api/local-ai/v1/chat/completions', async (req, res) => {
+		const result = await handleLocalAiChat({
+			authorization: req.headers.authorization,
+			remoteAddress: req.socket.remoteAddress,
+			body: req.body
+		});
+		res.status(result.status).json(result.body);
+	});
+
+	/** 直接使用软件自带的豆包助手，不依赖「模型接入」的模型选择。 */
+	app.post('/api/local-ai/doubao', async (req, res) => {
+		const result = await handleLocalAiDoubao({
+			authorization: req.headers.authorization,
+			remoteAddress: req.socket.remoteAddress,
+			body: req.body
+		});
+		res.status(result.status).json(result.body);
+	});
+
+	/**
+	 * 供外部 Chrome 中的脚本探测桌面端是否在线（仅本机回环可访问）。
+	 * `?doubao=1` 会顺带拉起豆包网关确认登录状态，脚本只在需要判断豆包可用性时使用。
+	 */
+	app.get('/api/local-ai/health', async (req, res) => {
+		if (!isLoopbackAddress(req.socket.remoteAddress)) {
+			res.status(403).json({ ok: false });
+			return;
+		}
+		res.json(
+			await buildLocalAiHealth({
+				version: electronApp.getVersion(),
+				probeDoubao: String(req.query.doubao || '') === '1'
+			})
+		);
 	});
 
 	// 静态资源

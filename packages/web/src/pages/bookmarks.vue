@@ -194,12 +194,13 @@
 <script setup lang="ts">
 import { onMounted, ref, reactive, computed } from 'vue';
 import { OCSApi } from '@ocs-desktop/common/src/api';
+import { mergeLocalPlatformBookmarks } from '@ocs-desktop/common/src/platforms';
 import { BookmarkResource } from '../../../common/src/api';
 import { iconUrl } from '../utils/index';
 
 type BookMark = BookmarkResource;
 
-const bookmarks = ref<BookMark[]>([]);
+const bookmarks = ref<BookMark[]>(mergeLocalPlatformBookmarks([]) as BookMark[]);
 const bookmarkSearch = ref('');
 const bookmarkGroup = ref('all');
 const hasBrowserContext = Boolean(getCurrentUid());
@@ -231,15 +232,12 @@ onMounted(async () => {
 	document.title = '超星自动机 · 学习导航';
 	try {
 	const infos = await OCSApi.getInfos();
-	console.log('OCS API infos:', infos);
-	console.log('bookmark data:', infos.bookmark);
 
 	document.title = '超星自动机 · 学习导航';
 
 	// 直接同步填充书签数据
 	for (let i = 0; i < infos.bookmark.length; i++) {
 		const bookmark = infos.bookmark[i] as BookMark;
-		console.log(`Processing bookmark[${i}]:`, bookmark);
 
 		bookmarks.value[i] = {
 			group: bookmark.group,
@@ -276,7 +274,11 @@ onMounted(async () => {
 			console.error('获取浏览器信息失败', e);
 		}
 	}
-	} catch { state.warn = true; state.tips = ['导航资源暂时无法加载，请检查网络后刷新。']; }
+	} catch {
+		bookmarks.value = mergeLocalPlatformBookmarks([]) as BookMark[];
+		state.warn = true;
+		state.tips = ['导航资源暂时无法加载，请检查网络后刷新。'];
+	}
 });
 
 function adjustColor(hex: string, percent: number): string {

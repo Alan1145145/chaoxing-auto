@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { mergeLocalPlatformBookmarks } from './platforms';
 
 /** 资源文件 */
 export interface ResourceFile {
@@ -83,6 +84,9 @@ export interface Infos {
 export class OCSApi {
 	static async getInfos(): Promise<Infos> {
 		const { data } = await axios.get('https://cdn.ocsjs.com/api/ocs-app-infos.json?t=' + Date.now());
-		return data;
+		return {
+			...data,
+			bookmark: mergeLocalPlatformBookmarks(Array.isArray(data.bookmark) ? data.bookmark : [])
+		} as Infos;
 	}
 }

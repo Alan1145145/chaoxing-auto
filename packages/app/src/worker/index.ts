@@ -462,64 +462,87 @@ export async function launchBrowser({
  */
 async function initScripts(urls: string[], browser: BrowserContext) {
 	console.log('install ', urls);
-	let installCont = 0;
+	const pending = [...urls];
 	let retryCount = 0;
 	const maxRetries = 120;
+	const findInstallPage = () => browser.pages().find((p) => /^chrome-extension:\/\//.test(p.url()));
 
-	// 触发下载
-	await (async () => {
-		for (const url of urls) {
-			const page = await browser.newPage();
-			try {
-				await Promise.race([page.goto(url).catch(() => {}), sleep(3 * 1000).then(() => page.close())]);
-			} catch {}
-		}
-	})();
-
-	// 检测脚本是否安装/更新完毕
-	const tryInstall = async () => {
-		if (browser.pages().length !== 0) {
-			const installPage = browser.pages().find((p) => /extension:\/\//.test(p.url()));
-			if (installPage) {
-				// 置顶页面，防止点击安装失败
-				await installPage.bringToFront();
-				await sleep(1000);
-				const closed = await installPage.evaluate(() => {
-					const btn = (document.querySelector('[class*="primary"]') ||
-						document.querySelector('[type*="button"]')) as HTMLElement;
-					// （由渲染进程版本检查过滤），直接点击按钮安装/更新
-					btn?.click();
-					if (!btn) {
-						return false;
-					}
-				});
-
-				if (!closed) {
-					await sleep(1000).then(() => installPage.close());
-				}
-
-				if (installPage.isClosed()) {
-					installCont++;
-				}
-				if (installCont < urls.length) {
-					retryCount = 0;
-					await tryInstall();
-				}
-			} else if (installCont === urls.length) {
-				//
-			} else {
-				retryCount++;
-				if (retryCount > maxRetries) {
-					console.error('脚本安装超时，跳过未安装的脚本');
-					return;
-				}
-				await sleep(1000);
-				await tryInstall();
-			}
-		}
+	const clickInstallButton = async (page: Page) => {
+		await page.bringToFront();
+		await sleep(800);
+		return page
+			.evaluate(() => {
+				const buttons = Array.from(
+					document.querySelectorAll<HTMLElement>('button, [role="button"], [class*="button"]')
+				);
+				const target =
+					buttons.find((button) => /安装|更新|确认/.test((button.innerText || '').trim())) ||
+					(document.querySelector('[class*="primary"]') as HTMLElement | null);
+				if (!target) return false;
+				target.click();
+				return true;
+			})
+			.catch(() => false);
 	};
 
-	await tryInstall();
+	/**
+	 * 脚本管理器一次只处理一个安装页：必须装完一个再触发下一个。
+	 * 同时打开多个 .user.js 会让其中一个请求被忽略（表现为脚本猫里始终「暂无数据」）。
+	 */
+	while (pending.length && retryCount <= maxRetries) {
+		const installPage = findInstallPage();
+		if (installPage) {
+			await clickInstallButton(installPage);
+			// ScriptCat 安装/更新可能弹出二次确认，也可能需要几秒写盘：等页面自然关闭再继续。
+			let closed = installPage.isClosed();
+			const waitStarted = Date.now();
+			while (!closed && Date.now() - waitStarted < 8000) {
+				await sleep(400);
+				if (installPage.isClosed()) {
+					closed = true;
+					break;
+				}
+				await installPage
+					.evaluate(() => {
+						const buttons = Array.from(
+							document.querySelectorAll<HTMLElement>('button, [role="button"], [class*="button"]')
+						);
+						const confirm = buttons.find((button) =>
+							/^(确认|确定|继续|仍然安装|安装|更新)$/.test((button.innerText || '').trim())
+						);
+						if (confirm) confirm.click();
+					})
+					.catch(() => undefined);
+			}
+			if (!closed) await installPage.close().catch(() => {});
+			pending.shift();
+			retryCount = 0;
+			await sleep(500);
+			continue;
+		}
+
+		const url = pending[0];
+		const page = await browser.newPage().catch(() => undefined);
+		if (!page) break;
+		page.goto(url).catch(() => {});
+		let appeared = false;
+		const started = Date.now();
+		while (Date.now() - started < 5000) {
+			if (findInstallPage()) {
+				appeared = true;
+				break;
+			}
+			await sleep(250);
+		}
+		await page.close().catch(() => {});
+		if (!appeared) {
+			retryCount++;
+			await sleep(1000);
+		}
+	}
+	if (pending.length) {
+		console.error('脚本安装超时，跳过未安装的脚本', pending);
+	}
 }
 
 function send(event: string, ...args: any[]) {

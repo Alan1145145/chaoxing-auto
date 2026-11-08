@@ -3,7 +3,8 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { decryptRenderString, encryptRenderString } from '../crypto';
-import { DOUBAO_PROVIDER_ID } from './doubao';
+import { DOUBAO_PROVIDER_ID, chatDoubao } from './doubao';
+import { answerWithFallback } from './provider-resilience';
 import { listProviderModels, validateProviderAddress } from './model-provider';
 
 import { callProvider } from './model-request';
@@ -160,6 +161,22 @@ function publicSettings(settings: QuestionBankSettings): QuestionBankSettings {
 
 export function getQuestionBankConfig(): QuestionBankSettings {
 	return publicSettings(readSettings());
+}
+
+export function describeSelectedProvider() {
+	try {
+		const settings = readSettings();
+		const provider = settings.providers.find((item) => item.id === settings.selectedProviderId && item.enabled);
+		if (!provider) return null;
+		return {
+			id: provider.id,
+			name: provider.name,
+			model: provider.model,
+			builtinDoubao: provider.id === DOUBAO_PROVIDER_ID
+		};
+	} catch {
+		return null;
+	}
 }
 
 export function saveQuestionBankConfig(input: QuestionBankSettings): QuestionBankSettings {
@@ -447,14 +464,47 @@ export async function queryQuestionBank(input: {
 	const provider = settings.providers.find((item) => item.id === settings.selectedProviderId && item.enabled);
 	if (!provider) throw new Error('尚未配置可用模型。请在软件侧边栏「模型接入」中添加并保存模型。');
 	const prompt = buildPrompt(title, options, type);
-	const content = await callProvider(provider, prompt, parseImages(input.images), 800, title);
+	const images = parseImages(input.images);
+	// 风控/限流时自动换下一个模型作答，避免整道题失败导致刷课暂停。
+	const outcome = await answerWithFallback({
+		providers: settings.providers,
+		selectedId: provider.id,
+		run: (candidate) => callProvider(candidate as QuestionBankProvider, prompt, images, 800, title)
+	});
+	const content = outcome.value;
+	const warnings =
+		outcome.provider.id === provider.id
+			? []
+			: [`「${provider.name || provider.id}」本次不可用，本题已改用「${outcome.provider.name || outcome.provider.id}」作答。`];
 	const answer = parseAnswer(content, options, type);
 	let id = `ai-${crypto.randomUUID()}`;
 	if (settings.autoSaveAiAnswers) {
 		const saved = saveQuestionBankQuestion({ title, options, type, answer, source: 'ai', verified: false });
 		id = saved.id;
 	}
-	return { id, answer, source: 'ai' as const, question: title };
+	return {
+		id,
+		answer,
+		source: 'ai' as const,
+		question: title,
+		provider: { id: outcome.provider.id, name: outcome.provider.name || '', model: outcome.provider.model || '' },
+		warnings,
+		fallbackFrom: outcome.failures.map((item) => ({ id: item.id, name: item.name, kind: item.kind }))
+	};
+}
+
+/** 直接使用当前选中的模型回答一段提示词（供本地 AI 接口转发内嵌脚本请求）。 */
+export async function chatWithSelectedProvider(prompt: string, options?: { maxTokens?: number }) {
+	const text = String(prompt || '').trim();
+	if (!text) throw new Error('请求内容不能为空。');
+	if (text.length > 200000) throw new Error('请求内容过长。');
+	const settings = readSettings();
+	const provider = settings.providers.find((item) => item.id === settings.selectedProviderId && item.enabled);
+	if (!provider) throw new Error('尚未配置可用模型。请在软件侧边栏「模型接入」中添加并保存模型。');
+	const maxTokens = Math.max(256, Math.min(Number(options?.maxTokens) || 2000, 4000));
+	const content = await callProvider(provider, text, [], maxTokens);
+	if (!content.trim()) throw new Error('模型没有返回内容。');
+	return { content, provider: { id: provider.id, name: provider.name, model: provider.model } };
 }
 
 function providerWithSavedKey(input: QuestionBankProvider): QuestionBankProvider {

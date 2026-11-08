@@ -3,13 +3,32 @@
 	"appId": "ocs.enncy.cn",
 	"extraMetadata": {
 		"name": "OCS Desktop",
-		"author": { "name": "alan34", "email": "" },
+		"author": {
+			"name": "alan34",
+			"email": ""
+		},
 		"description": "超星自动机：超星学习通自动学习、豆包 AI 答题与本地题库（基于 OCS Desktop 修改）。"
 	},
 	"productName": "超星自动机",
 	"asar": false,
-	"publish": [{ "provider": "github", "owner": "Alan1145145", "repo": "chaoxing-auto", "private": false, "releaseType": "release" }],
-	"files": ["lib/**/*", "public/**/*", "script.js", "package.json", "vendor/doubao/runtime/doubao-gateway/**/*", "LICENSE", "NOTICE.md"],
+	"publish": [
+		{
+			"provider": "github",
+			"owner": "Alan1145145",
+			"repo": "chaoxing-auto",
+			"private": false,
+			"releaseType": "release"
+		}
+	],
+	"files": [
+		"lib/**/*",
+		"public/**/*",
+		"script.js",
+		"package.json",
+		"vendor/doubao/runtime/doubao-gateway/**/*",
+		"LICENSE",
+		"NOTICE.md"
+	],
 	"copyright": "Copyright © 2021 enncy (OCS Desktop, MIT). Modified by alan34 2026.",
 	"nsis": {
 		"oneClick": true,
@@ -31,7 +50,9 @@
 			{
 				"from": "../../bin/chrome/win-${arch}/",
 				"to": "bin/chrome",
-				"filter": ["**/*.zip"]
+				"filter": [
+					"**/*.zip"
+				]
 			}
 		]
 	},
@@ -47,7 +68,9 @@
 			{
 				"from": "../../bin/chrome/mac-${arch}/",
 				"to": "bin/chrome",
-				"filter": ["**/*.zip"]
+				"filter": [
+					"**/*.zip"
+				]
 			}
 		]
 	},
@@ -63,7 +86,9 @@
 			{
 				"from": "../../bin/chrome/linux-${arch}/",
 				"to": "bin/chrome",
-				"filter": ["**/*.zip"]
+				"filter": [
+					"**/*.zip"
+				]
 			}
 		]
 	}

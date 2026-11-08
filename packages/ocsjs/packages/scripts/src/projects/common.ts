@@ -9,7 +9,14 @@ import {
 } from '@ocsjs/core';
 import { $message, h, $gm, $store, Project, Script, $modal, $ui, MessageElement, cors } from 'easy-us';
 import type { AnswererWrapper } from '@ocsjs/core';
-import { CXProject, ICourseProject, IcveMoocProject, YKTProject, ZHSProject, ZJYProject } from '../index';
+import {
+	CXProject,
+	ICourseProject,
+	IcveMoocProject,
+	YKTProject,
+	ZHSProject,
+	ZJYProject
+} from '../index';
 import { BackgroundProject } from './background';
 import { enableCopy } from '../utils';
 import { SearchInfosElement } from '../elements/search.infos';
@@ -1625,6 +1632,13 @@ export const CommonProject = Project.create({
 					return;
 				}
 				initEdgeMinimize();
+			},
+			// 悬浮窗可能延迟到页面 complete 才挂载，这里再补一次
+			oncomplete() {
+				if (self !== top) {
+					return;
+				}
+				initEdgeMinimize();
 			}
 		}),
 		hack: new Script({
@@ -1769,7 +1783,14 @@ const createGuide = () => {
 			h(
 				'div',
 				{ style: { display: 'flex', flexWrap: 'wrap', gap: '4px', maxWidth: '400px' } },
-				[CXProject, ZHSProject, ZJYProject, IcveMoocProject, ICourseProject, YKTProject].map((project) => {
+				[
+					CXProject,
+					ZHSProject,
+					ZJYProject,
+					IcveMoocProject,
+					ICourseProject,
+					YKTProject
+				].map((project) => {
 					const btn = h('button', { className: 'base-style-button-secondary' }, [project.name]);
 					btn.onclick = () => {
 						showProjectDetails(project);

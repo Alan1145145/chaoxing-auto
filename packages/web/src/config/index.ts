@@ -29,6 +29,10 @@ export const config = reactive({
 					meta: { icon: 'space_dashboard', title: '学习概览' }
 				},
 				{
+					name: 'xuexi', path: 'xuexi', component: () => import('@/pages/xuexi/index.vue'),
+					meta: { icon: 'local_fire_department', title: '学习强国' }
+				},
+				{
 					name: 'doubao', path: 'doubao', component: () => import('@/pages/doubao/index.vue'),
 					meta: { icon: 'auto_awesome', title: '豆包助手' }
 				},

@@ -2,8 +2,8 @@ import { existsSync } from 'fs';
 import { join } from 'path';
 import { ValidBrowser } from '../interface';
 import os from 'os';
-import { app } from 'electron';
 import { getBuiltinChromeRoot, getBuiltinChromeRuntimeRoot } from './chrome.path';
+import { getElectronApp } from './electron';
 
 // 获取可用浏览器路径
 export function getValidBrowsers(): ValidBrowser[] {
@@ -56,6 +56,7 @@ export function getValidBrowsers(): ValidBrowser[] {
  * - 开发模式 zip 源路径：`bin/chrome/<platform>-<arch>/`
  */
 function resolveBuiltinChromePath(relativeTail: string): string | undefined {
+	const app = getElectronApp();
 	return [
 		join(getBuiltinChromeRuntimeRoot(), relativeTail),
 		join(app.getPath('userData'), 'bin', 'chrome', relativeTail),
@@ -65,6 +66,7 @@ function resolveBuiltinChromePath(relativeTail: string): string | undefined {
 }
 
 function resolveBrowserPath(commonPath: string) {
+	const app = getElectronApp();
 	return [
 		join(app.getPath('userData'), commonPath),
 		join(process.resourcesPath, commonPath),

@@ -1,5 +1,5 @@
 import path from 'path';
-import { app } from 'electron';
+import { getElectronApp } from './electron';
 
 /**
  * 内置 Chrome 解压根目录。
@@ -12,6 +12,7 @@ import { app } from 'electron';
  * 平台串 `<platform>-<arch>` 与 chrome.install.js 的 `${PLATFORM || 'win'}-${ARCH || 'x64'}` 保持一致。
  */
 export function getBuiltinChromeRoot(): string {
+	const app = getElectronApp();
 	if (app.isPackaged) {
 		return path.join(process.resourcesPath, 'bin', 'chrome');
 	}
@@ -26,6 +27,7 @@ export function getBuiltinChromeRoot(): string {
  * 打包模式使用 userData 下可写目录，开发模式使用项目 bin 目录。
  */
 export function getBuiltinChromeRuntimeRoot(): string {
+	const app = getElectronApp();
 	if (app.isPackaged) {
 		return path.join(app.getPath('userData'), 'bin', 'chrome');
 	}

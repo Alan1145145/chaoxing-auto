@@ -77,6 +77,13 @@ export function performEmbeddedStorageByToken(token: string, action: string, key
 	return performEmbeddedStorage(profile, action, key, value);
 }
 
+/** 供内嵌页面调用本地 AI 等接口时校验身份，令牌与 GM 存储桥一致。 */
+export function isEmbeddedStorageTokenValid(token: string) {
+	const value = String(token || '').trim();
+	if (!value) return false;
+	return Array.from(storageTokens.values()).includes(value);
+}
+
 export function performEmbeddedStorage(profile: string, action: string, key: string, value?: unknown) {
 	const cache = profileCache(profile);
 	const values = cache.values;

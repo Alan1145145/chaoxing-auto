@@ -38,15 +38,47 @@ const infos = GM_info;
 
 	const projects = definedProjects();
 
-	// 运行脚本
-	start({
-		projects: projects,
-		renderConfig: {
-			renderScript: RenderScript,
-			styles: [STYLE],
-			defaultPanelName: CommonProject.scripts.guide.namespace,
-			title: `${logoSvg} OCS <span style="font-size: 12px; color: #969696;">v${infos.script.version}</span>`
-		},
-		updatePage: 'https://docs.ocsjs.com/docs/update'
-	});
+	let started = false;
+	const run = () => {
+		if (started) {
+			return;
+		}
+		started = true;
+		// 运行脚本
+		start({
+			projects: projects,
+			renderConfig: {
+				renderScript: RenderScript,
+				styles: [STYLE],
+				defaultPanelName: CommonProject.scripts.guide.namespace,
+				title: `${logoSvg} OCS <span style="font-size: 12px; color: #969696;">v${infos.script.version}</span>`
+			},
+			updatePage: 'https://docs.ocsjs.com/docs/update'
+		});
+	};
+
+	/**
+	 * U校园课程页（ucontent）在 document-start 阶段仍在 document.write 和鉴权，
+	 * 此时启动脚本会打断页面加载并陷入反复登录，等页面 complete 后再启动。
+	 */
+	if (location.hostname === 'ucontent.unipus.cn' && document.readyState !== 'complete') {
+		const onReady = () => {
+			if (document.readyState === 'complete') {
+				document.removeEventListener('readystatechange', onReady);
+				run();
+			}
+		};
+		document.addEventListener('readystatechange', onReady);
+		window.addEventListener(
+			'load',
+			() => {
+				document.removeEventListener('readystatechange', onReady);
+				run();
+			},
+			{ once: true }
+		);
+		return;
+	}
+
+	run();
 })();

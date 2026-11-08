@@ -114,12 +114,15 @@ export async function parseMetaDataResources(
 ) {
 	const resources: string[] = [];
 	for (const line of Array.isArray(resource) ? resource : [resource]) {
-		const values = line.replace(/ /g, ' ').split(' ');
+		// 只按第一个空白拆分，保留路径中的空格（例如项目目录名带空格）
+		const match = line.trim().match(/^(\S+)\s+([\s\S]+)$/);
+		if (!match) continue;
+		const [, key, value] = match;
 
-		const text = values[1].startsWith('http')
-			? await fetch(values[1]).then((res) => res.text())
-			: readFileSync(values[1]).toString();
-		resources.push(resourceBuilder(values[0], text));
+		const text = value.startsWith('http')
+			? await fetch(value).then((res) => res.text())
+			: readFileSync(value).toString();
+		resources.push(resourceBuilder(key, text));
 	}
 	return resources.join('\n');
 }

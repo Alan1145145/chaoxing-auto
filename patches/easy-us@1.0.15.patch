@@ -1,0 +1,37 @@
+diff --git a/lib/interfaces/custom-window.js b/lib/interfaces/custom-window.js
+index bd52dab7b2df7a0b8d7eee51922333b2ced816b6..6e51ca4fd7267d58efd755c655c702d2c801c7f5 100644
+--- a/lib/interfaces/custom-window.js
++++ b/lib/interfaces/custom-window.js
+@@ -412,8 +412,14 @@ class CustomWindow {
+      * @param parent 挂载的父元素
+      */
+     mount(parent) {
+-        // 随机位置插入操作面板到页面
+-        parent.children[utils_1.$.random(0, parent.children.length - 1)].after(this.wrapper);
++        // 随机位置插入操作面板到页面；ucontent 等 SPA 壳在 readystatechange 时 body 还没有子节点
++        const anchor = parent.children[utils_1.$.random(0, parent.children.length - 1)];
++        if (anchor) {
++            anchor.after(this.wrapper);
++        }
++        else {
++            parent.append(this.wrapper);
++        }
+     }
+ }
+ exports.CustomWindow = CustomWindow;
+diff --git a/lib/utils/start.js b/lib/utils/start.js
+index 3d4f0bfb23461b1b8b3f241e2e8c8db8a5600fa7..7fa6015859651cc57633d07d0c8b5887c24508ee 100644
+--- a/lib/utils/start.js
++++ b/lib/utils/start.js
+@@ -181,6 +181,11 @@ function mount(startConfig) {
+         if (mounted === true) {
+             return;
+         }
++        // 延迟到页面完全加载后再挂载悬浮窗：部分 SPA（如 U校园 ucontent）
++        // 在 interactive 阶段仍在使用 document.write / 鉴权，提前插入节点会导致页面停在 loading。
++        if (typeof document !== 'undefined' && document.readyState !== 'complete') {
++            return;
++        }
+         mounted = true;
+         if (startConfig === undefined || startConfig.renderConfig === undefined) {
+             console.warn('the script will not have ui because the renderConfig is not defined.');

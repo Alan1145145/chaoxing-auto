@@ -1,6 +1,10 @@
 packages:
   - packages/**
   - '!**/dist*/**'
+  - '!packages/app/vendor/doubao/runtime/**'
 
 onlyBuiltDependencies:
   - electron
+
+patchedDependencies:
+  easy-us@1.0.15: patches/easy-us@1.0.15.patch

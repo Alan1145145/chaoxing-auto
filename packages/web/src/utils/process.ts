@@ -11,6 +11,7 @@ import { child_process } from './node';
 import { notify } from './notify';
 import { Status } from './statusBar';
 import { filterScriptsNeedingInstall } from './script-version';
+import { ensureBuiltinUserScripts } from './user-scripts';
 
 export type RemoteScriptWorker = <W extends keyof ScriptWorker = keyof ScriptWorker>(
 	event: W,
@@ -143,6 +144,8 @@ export class Process extends EventEmitter {
 
 			// 脚本检查
 			Status.loading('正在检查本地脚本...');
+			// 内置 OCS 与 U校园助手：缺失时自动补进脚本列表，避免新浏览器里没有任何脚本。
+			await ensureBuiltinUserScripts();
 			const enabledUserScripts = store.render.scripts.filter((s) => s.enable);
 			for (const s of enabledUserScripts) {
 				if (!s.url.startsWith('http')) {

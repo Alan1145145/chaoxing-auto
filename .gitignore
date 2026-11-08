@@ -1,4 +1,8 @@
 # customize 
+# Local Electron distributable used for offline packaging
+.electron-dist/
+# Agent/session temporary files
+.zcode/
 # Doubao runtime build environment / local authentication
 .doubao-venv/
 .doubao-build/

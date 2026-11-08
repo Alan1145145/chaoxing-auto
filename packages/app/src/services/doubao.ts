@@ -6,9 +6,13 @@ import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
 import { encryptRenderString, decryptRenderString } from '../crypto';
+import { classifyFailure, coolProvider, pace, providerCooldown } from './provider-resilience';
 
 export const DOUBAO_PROVIDER_ID = 'builtin-doubao';
 const models = ['doubao-fast', 'doubao-expert', 'doubao-auto', 'doubao-turbo', 'doubao-pro', 'doubao-2.1-lite'];
+/** 豆包网关单次请求的字数上限，脚本侧据此决定是否退回「模型接入」链路。 */
+export const DOUBAO_MAX_PROMPT_LENGTH = 30000;
+export const DOUBAO_MODELS = models;
 let child: ChildProcess | undefined;
 let starting: Promise<void> | undefined;
 let baseUrl = '';
@@ -17,6 +21,8 @@ let loginWindow: BrowserWindow | undefined;
 let loginError = '';
 let accountGeneration = 0;
 let chatting = false;
+/** 最近一次已知的登录状态；null 表示本次运行还没探测过。 */
+let lastKnownLogin: boolean | null = null;
 
 function credentialFile() {
 	return path.join(app.getPath('userData'), 'doubao', 'session.enc');
@@ -66,8 +72,14 @@ function gatewayLogFile() {
 	return path.join(app.getPath('logs'), 'doubao-gateway.log');
 }
 function redact(text: string) {
+	// 敏感字段名太长，单独拼成一行正则源码，避免整行超过 120 列。
+	const secrets = new RegExp(
+		'(cookie|authorization|sessionid|sid_tt|sid_guard|uid_tt|ttwid|passport_csrf_token|token)' +
+			'([^\\n]{0,4}[=:]\\s*)[^\\s;,&"\']+',
+		'gi'
+	);
 	return text
-		.replace(/(cookie|authorization|sessionid|sid_tt|sid_guard|uid_tt|ttwid|passport_csrf_token|token)([^\n]{0,4}[=:]\s*)[^\s;,&"']+/gi, '$1$2***')
+		.replace(secrets, '$1$2***')
 		.replace(/Bearer\s+[A-Za-z0-9._-]+/g, 'Bearer ***')
 		.replace(/\/login\/qr\/[^\s"']+/g, '/login/qr/***');
 }
@@ -116,16 +128,23 @@ async function boot() {
 	// It is only kept, redacted, in the local log file for troubleshooting.
 	appendGatewayLog(`\n[${new Date().toISOString()}] start ${runtime} port=${port}\n`);
 	processHandle.stderr?.on('data', (data) => appendGatewayLog(String(data)));
-	processHandle.on('error', (error: NodeJS.ErrnoException) => {
+	processHandle.on('error', (error: Error & { code?: string }) => {
 		appendGatewayLog(`[spawn error] ${error.code || ''} ${error.message}\n`);
 		failed = app.isPackaged
-			? `豆包网关无法启动（${error.code || error.message}）。可能被杀毒软件或系统安全策略拦截，请将软件安装目录加入信任区后重试。`
+			? `豆包网关无法启动（${
+					error.code || error.message
+			  }）。可能被杀毒软件或系统安全策略拦截，请将软件安装目录加入信任区后重试。`
 			: '豆包运行环境启动失败，请构建内置网关或配置 Python 3.10+ 和 Flask。';
-		if (child === processHandle) { child = undefined; baseUrl = ''; }
+		if (child === processHandle) {
+			child = undefined;
+			baseUrl = '';
+		}
 	});
 	processHandle.on('exit', (code, signal) => {
 		appendGatewayLog(`[exit] code=${code} signal=${signal}\n`);
-		failed = failed || `豆包网关启动后已退出（退出码 ${code ?? signal}），可能被杀毒软件拦截，详见日志目录 doubao-gateway.log。`;
+		failed =
+			failed ||
+			`豆包网关启动后已退出（退出码 ${code ?? signal}），可能被杀毒软件拦截，详见日志目录 doubao-gateway.log。`;
 		if (child === processHandle) {
 			child = undefined;
 			baseUrl = '';
@@ -153,7 +172,15 @@ export async function ensureDoubao() {
 export async function getDoubaoStatus() {
 	await ensureDoubao();
 	const { data } = await request('GET', '/health');
-	return { running: true, loggedIn: Boolean(data.ok), models, loginError };
+	lastKnownLogin = Boolean(data.ok);
+	return { running: true, loggedIn: lastKnownLogin, models, loginError };
+}
+/**
+ * 不启动网关的只读状态，供本地 AI 健康探测使用。
+ * 探测接口在每次页面加载时都会调用，不能每次都拉起子进程。
+ */
+export function peekDoubaoStatus() {
+	return { running: Boolean(child && baseUrl), loggedIn: lastKnownLogin, models, loginError };
 }
 export async function startDoubaoQr() {
 	await ensureDoubao();
@@ -264,12 +291,19 @@ export async function logoutDoubao() {
 	return getDoubaoStatus();
 }
 export async function chatDoubao(input: { prompt: string; model?: string; conversationId?: string }) {
-	if (!input.prompt?.trim() || input.prompt.length > 30000) throw new Error('请输入 1–30000 字的问题。');
+	if (!input.prompt?.trim() || input.prompt.length > DOUBAO_MAX_PROMPT_LENGTH)
+		throw new Error(`请输入 1–${DOUBAO_MAX_PROMPT_LENGTH} 字的问题。`);
 	if (chatting) throw new Error('豆包正在回答，请等待当前回答完成。');
 	if (input.model && !models.includes(input.model)) throw new Error('不支持的豆包模型。');
+	const cooling = providerCooldown(DOUBAO_PROVIDER_ID);
+	if (cooling) {
+		throw new Error(`内置豆包仍在风控冷却中（剩余 ${Math.ceil(cooling.remainingMs / 1000)} 秒），请稍后再试或改用其它模型。`);
+	}
 	chatting = true;
 	try {
 		await ensureDoubao();
+		// 相邻调用之间留间隔，降低豆包网页版风控（type=verify / semantic_reasoning）触发概率。
+		await pace();
 		const { data } = await axios.post(
 			baseUrl + '/v1/chat/completions',
 			{
@@ -288,11 +322,22 @@ export async function chatDoubao(input: { prompt: string; model?: string; conver
 		);
 		const content = data.choices?.[0]?.message?.content;
 		if (typeof content !== 'string' || !content.trim()) throw new Error('豆包未返回有效回答。');
+		lastKnownLogin = true;
 		return { content, conversationId: String(data.doubao?.conversation_id || '') };
 	} catch (error: any) {
 		// Do not serialize AxiosError: its config contains the private bearer token.
 		const message = error.response?.data?.error?.message;
-		throw new Error(typeof message === 'string' ? message.slice(0, 300) : '豆包请求失败，请检查登录状态和网络后重试。');
+		const detail = typeof message === 'string' ? message.slice(0, 300) : '';
+		const kind = classifyFailure(detail || error);
+		if (kind === 'risk' || kind === 'rate') {
+			const seconds = Math.ceil(coolProvider(DOUBAO_PROVIDER_ID, kind, detail) / 1000);
+			throw new Error(
+				kind === 'risk'
+					? `内置豆包触发豆包官网风控验证（${detail || 'type=verify'}），已暂停该模型 ${seconds} 秒并自动改用其它模型；若其它模型也不可用，请在软件里重新登录豆包完成验证后再试。`
+					: `内置豆包请求被限流（${detail || 'rate limited'}），已暂停该模型 ${seconds} 秒并自动改用其它模型。`
+			);
+		}
+		throw new Error(detail || '豆包请求失败，请检查登录状态和网络后重试。');
 	} finally {
 		chatting = false;
 	}

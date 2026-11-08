@@ -52,6 +52,27 @@ const registeredContents = new WeakSet<WebContents>();
 const embeddedSyncQueues = new Map<string, Promise<unknown>>();
 const debuggerCommandQueues = new Map<number, Promise<void>>();
 
+type EmbeddedUserscriptOptions = {
+	/** 相对 packages/app 的脚本路径 */
+	relativePath: string;
+	/** 文件缺失时是否直接报错 */
+	required: boolean;
+	/**
+	 * 弹出后需要防止被页面移除的元素 id。
+	 * U校园 ucontent 是重绘型 SPA，第三方脚本的悬浮球/面板直接挂在 body 上，
+	 * 路由切换时可能被一并清掉，这里定期把脱管的元素挂回去。
+	 */
+	keepAliveIds?: string[];
+};
+
+/**
+ * 内嵌浏览器随包携带的 userscript 列表。
+ * OCS 为主脚本；resources/userscripts 下是第三方脚本（原样保留各自的许可声明）。
+ */
+const EMBEDDED_USERSCRIPTS: EmbeddedUserscriptOptions[] = [
+	{ relativePath: path.join('public', 'ocsjs', 'ocs.user.js'), required: true }
+];
+
 /** Prepare a dedicated persistent Electron session for an embedded browser profile. */
 export async function prepareEmbeddedBrowser(uid: string) {
 	assertUid(uid);
@@ -82,21 +103,29 @@ async function syncEmbeddedOcsjsNow(uid: string, enabled: boolean, webContentsId
 	const state = contentsId === undefined ? undefined : networkStates.get(contentsId);
 	if (!state) throw new Error('内嵌浏览器调试桥尚未就绪，请等待页面加载完成后重试。');
 
-	let script = '';
-	let metadata: ParsedUserscriptMetadata | undefined;
+	const scripts: { options: EmbeddedUserscriptOptions; source: string; metadata: ParsedUserscriptMetadata }[] = [];
 	if (enabled) {
 		const appRoot = path.resolve(__dirname, '../../..');
-		const scriptPath = path.join(appRoot, 'public', 'ocsjs', 'ocs.user.js');
-		if (!fs.existsSync(scriptPath)) throw new Error(`OCSJS 本地脚本不存在：${scriptPath}，请先运行 pnpm build:ocsjs。`);
-		script = fs.readFileSync(scriptPath, 'utf8');
-		metadata = parseUserscriptMetadata(script);
-		if (!metadata.match.length) throw new Error('OCSJS 脚本没有可用的 @match 规则。');
+		for (const options of EMBEDDED_USERSCRIPTS) {
+			const scriptPath = path.join(appRoot, options.relativePath);
+			if (!fs.existsSync(scriptPath)) {
+				if (options.required) throw new Error(`OCSJS 本地脚本不存在：${scriptPath}，请先运行 pnpm build:ocsjs。`);
+				continue;
+			}
+			const source = fs.readFileSync(scriptPath, 'utf8');
+			const metadata = parseUserscriptMetadata(source);
+			if (!metadata.match.length) {
+				if (options.required) throw new Error('OCSJS 脚本没有可用的 @match 规则。');
+				continue;
+			}
+			scripts.push({ options, source, metadata });
+		}
 	}
 
 	await ensureUserscriptRuntime(contents, state);
 	await removeScriptInjections(contents, state);
 
-	if (!enabled || !metadata) {
+	if (!enabled || scripts.length === 0) {
 		const shouldReload = matchesUserscriptUrl(state.scriptMatchPatterns, getCurrentUrl(contents));
 		state.gmAllowedHosts = [];
 		state.scriptMatchPatterns = [];
@@ -105,21 +134,33 @@ async function syncEmbeddedOcsjsNow(uid: string, enabled: boolean, webContentsId
 		return { enabled: false };
 	}
 
-	const source = createOcsjsRuntimeSource(script, metadata, state.gmBindingName, state.gmResponseEvent, {
-		url: `http://127.0.0.1:${store.store.server.port || 15319}/api/embedded-gm-storage`,
-		token: getEmbeddedStorageToken(uid)
-	});
-	state.scriptRuntimeSource = source;
-	const result = await sendDebuggerCommand<{ identifier?: string }>(contents, 'Page.addScriptToEvaluateOnNewDocument', {
-		source
-	});
-	if (result?.identifier) state.scriptInjectionIdentifiers.push(result.identifier);
-	state.gmAllowedHosts = metadata.connect;
-	state.scriptMatchPatterns = metadata.match;
+	// 多脚本（OCS + U校园 助手 + …）各自生成运行时源；同时拼接一份Combined源，
+	// 供远程新增的「课程框架补注入」逻辑在 did-frame-finish-load 时整包执行。
+	const combinedRuntimeSources: string[] = [];
+	for (const { options, source, metadata } of scripts) {
+		const runtimeSource = createOcsjsRuntimeSource(source, metadata, state.gmBindingName, state.gmResponseEvent, {
+			url: `http://127.0.0.1:${store.store.server.port || 15319}/api/embedded-gm-storage`,
+			token: getEmbeddedStorageToken(uid),
+			localAiUrl: `http://127.0.0.1:${store.store.server.port || 15319}/api/local-ai/v1/chat/completions`,
+			keepAliveIds: options.keepAliveIds
+		});
+		combinedRuntimeSources.push(runtimeSource);
+		const result = await sendDebuggerCommand<{ identifier?: string }>(
+			contents,
+			'Page.addScriptToEvaluateOnNewDocument',
+			{
+				source: runtimeSource
+			}
+		);
+		if (result?.identifier) state.scriptInjectionIdentifiers.push(result.identifier);
+	}
+	state.scriptRuntimeSource = combinedRuntimeSources.join('\n;\n');
+	state.gmAllowedHosts = scripts.flatMap((entry) => entry.metadata.connect);
+	state.scriptMatchPatterns = scripts.flatMap((entry) => entry.metadata.match);
 
 	const currentUrl = getCurrentUrl(contents);
-	if (matchesUserscriptUrl(metadata.match, currentUrl)) contents.reload();
-	return { enabled: true, version: metadata.version, matches: metadata.match.length };
+	if (matchesUserscriptUrl(state.scriptMatchPatterns, currentUrl)) contents.reload();
+	return { enabled: true, version: scripts[0].metadata.version, matches: state.scriptMatchPatterns.length };
 }
 
 /** Associate the guest webContents with its browser profile for the OCSJS bridge. */
@@ -709,6 +750,7 @@ type ParsedUserscriptMetadata = {
 	namespace: string;
 	match: string[];
 	connect: string[];
+	runAt: string;
 };
 
 function parseUserscriptMetadata(source: string): ParsedUserscriptMetadata {
@@ -727,7 +769,8 @@ function parseUserscriptMetadata(source: string): ParsedUserscriptMetadata {
 		version: fields.get('version')?.[0] || '0.0.0',
 		namespace: fields.get('namespace')?.[0] || 'https://enncy.cn',
 		match: fields.get('match') || [],
-		connect: fields.get('connect') || []
+		connect: fields.get('connect') || [],
+		runAt: fields.get('run-at')?.[0] || 'document-start'
 	};
 }
 
@@ -736,7 +779,7 @@ function createOcsjsRuntimeSource(
 	metadata: ParsedUserscriptMetadata,
 	bindingName: string,
 	responseEvent: string,
-	storage: { url: string; token: string }
+	storage: { url: string; token: string; keepAliveIds?: string[]; localAiUrl?: string }
 ) {
 	const header = source.match(/\/\/\s*==UserScript==[\s\S]*?\/\/\s*==\/UserScript==/);
 	const body = header ? source.replace(header[0], '') : source;
@@ -762,6 +805,8 @@ function createOcsjsRuntimeSource(
 		]
 	});
 	const matchJson = JSON.stringify(metadata.match);
+	const runAtJson = JSON.stringify(metadata.runAt);
+	const keepAliveJson = JSON.stringify(storage.keepAliveIds || []);
 
 	return `(() => {
 	const __ocsPatterns = ${matchJson};
@@ -834,86 +879,107 @@ function createOcsjsRuntimeSource(
 		}
 	};
 
-	globalThis.unsafeWindow = globalThis;
-	globalThis.GM_info = {
-		scriptHandler: 'OCS Embedded',
-		script: { name: __ocsMeta.name, version: __ocsMeta.version, namespace: __ocsMeta.namespace, matches: __ocsMeta.match, grants: __ocsMeta.grant }
-	};
-	globalThis.GM_getValue = (key, fallback) => __ocsGetValue(key, fallback);
-	globalThis.GM_setValue = (key, value) => {
+		// 多个 userscript 共存时，GM API 以闭包常量提供给脚本本体，
+		// 全局仅由第一个脚本注册一次（OCS 入口会检测 globalThis 上的 GM API 是否存在）。
+		const __ocsDefineGlobal = (name, value) => {
+			try {
+				if (typeof globalThis[name] === 'undefined') globalThis[name] = value;
+			} catch (error) {
+				console.error('OCS GM global install failed', error);
+			}
+		};
+		const unsafeWindow = globalThis;
+		__ocsDefineGlobal('unsafeWindow', unsafeWindow);
+		__ocsDefineGlobal('__ocsLocalAI', {
+			chatUrl: ${JSON.stringify(storage.localAiUrl || '')},
+			token: ${JSON.stringify(storage.token)}
+		});
+		const GM_info = {
+			scriptHandler: 'OCS Embedded',
+			script: { name: __ocsMeta.name, version: __ocsMeta.version, namespace: __ocsMeta.namespace, matches: __ocsMeta.match, grants: __ocsMeta.grant }
+		};
+		__ocsDefineGlobal('GM_info', GM_info);
+		const GM_getValue = (key, fallback) => __ocsGetValue(key, fallback);
+		__ocsDefineGlobal('GM_getValue', GM_getValue);
+		const GM_setValue = (key, value) => {
 		const storageKey = __ocsStoragePrefix + String(key);
 		const oldValue = __ocsGetValue(key, undefined);
-		if (JSON.stringify(oldValue) === JSON.stringify(value)) return;
-		const stored = __ocsCloneValue(value);
-		__ocsValueCache.set(storageKey, stored);
-		__ocsSnapshot[storageKey] = stored;
-		try { __ocsSharedStorage.call('set', storageKey, value); localStorage.setItem(storageKey, JSON.stringify(value)); __ocsEmitChange(String(key), oldValue, value, false); }
-		catch (error) { console.error('OCS GM_setValue failed', error); }
-	};
-	globalThis.GM_deleteValue = (key) => {
-		const oldValue = __ocsGetValue(key, undefined);
-		__ocsValueCache.set(__ocsStoragePrefix + String(key), { __ocsDeleted: true });
-		__ocsSnapshot[__ocsStoragePrefix + String(key)] = { __ocsDeleted: true };
-		try { __ocsSharedStorage.call('delete', __ocsStoragePrefix + String(key)); localStorage.removeItem(__ocsStoragePrefix + String(key)); __ocsEmitChange(String(key), oldValue, undefined, false); }
-		catch (error) { console.error('OCS GM_deleteValue failed', error); }
-	};
-	globalThis.GM_listValues = () => {
-		const keys = Object.keys(__ocsSnapshot).filter(key => key.startsWith(__ocsStoragePrefix) && !__ocsDeleted(__ocsSnapshot[key])).map(key => key.slice(__ocsStoragePrefix.length));
-		for (let index = 0; index < localStorage.length; index++) {
-			const key = localStorage.key(index);
-			if (Object.prototype.hasOwnProperty.call(__ocsSnapshot, key) && __ocsDeleted(__ocsSnapshot[key])) continue;
-			if (key && key.startsWith(__ocsStoragePrefix) && key !== __ocsTabStorageKey && !keys.includes(key.slice(__ocsStoragePrefix.length))) keys.push(key.slice(__ocsStoragePrefix.length));
-		}
-		return keys;
-	};
-	globalThis.GM_getTab = (callback) => {
-		const tab = __ocsReadJson(sessionStorage, __ocsTabStorageKey, {});
-		if (typeof callback === 'function') callback(tab);
-		return tab;
-	};
-	globalThis.GM_saveTab = (tab) => {
-		try { sessionStorage.setItem(__ocsTabStorageKey, JSON.stringify(tab || {})); }
-		catch (error) { console.error('OCS GM_saveTab failed', error); }
-	};
-	globalThis.GM_addValueChangeListener = (key, listener) => {
-		const id = ++__ocsListenerId;
-		__ocsListeners.set(id, { key: String(key), listener });
-		return id;
-	};
-	globalThis.GM_removeValueChangeListener = (id) => __ocsListeners.delete(id);
-	globalThis.GM_getResourceText = () => '';
-	globalThis.GM_notification = (details, title, image, onclick) => {
-		const options = typeof details === 'object' && details !== null ? details : { text: String(details || ''), title: String(title || '') };
-		if (typeof Notification === 'undefined') return undefined;
-		const show = () => {
-			try {
-				const notification = new Notification(options.title || __ocsMeta.name, { body: options.text || options.body || '', icon: options.image || image });
-				if (typeof options.onclick === 'function' || typeof onclick === 'function') notification.onclick = options.onclick || onclick;
-				return notification;
-			} catch { return undefined; }
+			__ocsValueCache.set(storageKey, value);
+			try { __ocsSharedStorage.call('set', storageKey, value); localStorage.setItem(storageKey, JSON.stringify(value)); __ocsEmitChange(String(key), oldValue, value, false); }
+			catch (error) { console.error('OCS GM_setValue failed', error); }
 		};
-		if (Notification.permission === 'granted') return show();
-		if (Notification.permission === 'default') Notification.requestPermission().then((permission) => { if (permission === 'granted') show(); }).catch(() => {});
-		return undefined;
-	};
-	globalThis.GM_xmlhttpRequest = (details) => {
-		if (typeof __ocsBinding !== 'function') {
-			const error = { error: 'OCS GM_xmlhttpRequest bridge is unavailable' };
-			queueMicrotask(() => details?.onerror?.(error));
-			return { abort() {} };
-		}
-		const id = String(Date.now()) + '_' + Math.random().toString(36).slice(2);
-		__ocsRequests.set(id, details || {});
-		__ocsBinding(JSON.stringify({ id, details: {
-			url: details?.url,
-			method: details?.method || 'GET',
-			headers: details?.headers || {},
-			data: details?.data,
-			responseType: details?.responseType || 'text',
-			timeout: details?.timeout || 30000
-		} }));
-		return { abort: () => { try { __ocsBinding(JSON.stringify({ id, action: 'abort' })); } catch {} } };
-	};
+		__ocsDefineGlobal('GM_setValue', GM_setValue);
+		const GM_deleteValue = (key) => {
+			const oldValue = __ocsGetValue(key, undefined);
+			__ocsValueCache.delete(__ocsStoragePrefix + String(key));
+			try { __ocsSharedStorage.call('delete', __ocsStoragePrefix + String(key)); localStorage.removeItem(__ocsStoragePrefix + String(key)); __ocsEmitChange(String(key), oldValue, undefined, false); }
+			catch (error) { console.error('OCS GM_deleteValue failed', error); }
+		};
+		__ocsDefineGlobal('GM_deleteValue', GM_deleteValue);
+		const GM_listValues = () => {
+			const keys = __ocsSharedStorage.call('keys', '').filter(key => key.startsWith(__ocsStoragePrefix)).map(key => key.slice(__ocsStoragePrefix.length));
+			for (let index = 0; index < localStorage.length; index++) {
+				const key = localStorage.key(index);
+				if (key && key.startsWith(__ocsStoragePrefix) && key !== __ocsTabStorageKey && !keys.includes(key.slice(__ocsStoragePrefix.length))) keys.push(key.slice(__ocsStoragePrefix.length));
+			}
+			return keys;
+		};
+		__ocsDefineGlobal('GM_listValues', GM_listValues);
+		const GM_getTab = (callback) => {
+			const tab = __ocsReadJson(sessionStorage, __ocsTabStorageKey, {});
+			if (typeof callback === 'function') callback(tab);
+			return tab;
+		};
+		__ocsDefineGlobal('GM_getTab', GM_getTab);
+		const GM_saveTab = (tab) => {
+			try { sessionStorage.setItem(__ocsTabStorageKey, JSON.stringify(tab || {})); }
+			catch (error) { console.error('OCS GM_saveTab failed', error); }
+		};
+		__ocsDefineGlobal('GM_saveTab', GM_saveTab);
+		const GM_addValueChangeListener = (key, listener) => {
+			const id = ++__ocsListenerId;
+			__ocsListeners.set(id, { key: String(key), listener });
+			return id;
+		};
+		__ocsDefineGlobal('GM_addValueChangeListener', GM_addValueChangeListener);
+		const GM_removeValueChangeListener = (id) => __ocsListeners.delete(id);
+		__ocsDefineGlobal('GM_removeValueChangeListener', GM_removeValueChangeListener);
+		const GM_getResourceText = () => '';
+		__ocsDefineGlobal('GM_getResourceText', GM_getResourceText);
+		const GM_notification = (details, title, image, onclick) => {
+			const options = typeof details === 'object' && details !== null ? details : { text: String(details || ''), title: String(title || '') };
+			if (typeof Notification === 'undefined') return undefined;
+			const show = () => {
+				try {
+					const notification = new Notification(options.title || __ocsMeta.name, { body: options.text || options.body || '', icon: options.image || image });
+					if (typeof options.onclick === 'function' || typeof onclick === 'function') notification.onclick = options.onclick || onclick;
+					return notification;
+				} catch { return undefined; }
+			};
+			if (Notification.permission === 'granted') return show();
+			if (Notification.permission === 'default') Notification.requestPermission().then((permission) => { if (permission === 'granted') show(); }).catch(() => {});
+			return undefined;
+		};
+		__ocsDefineGlobal('GM_notification', GM_notification);
+		const GM_xmlhttpRequest = (details) => {
+			if (typeof __ocsBinding !== 'function') {
+				const error = { error: 'OCS GM_xmlhttpRequest bridge is unavailable' };
+				queueMicrotask(() => details?.onerror?.(error));
+				return { abort() {} };
+			}
+			const id = String(Date.now()) + '_' + Math.random().toString(36).slice(2);
+			__ocsRequests.set(id, details || {});
+			__ocsBinding(JSON.stringify({ id, details: {
+				url: details?.url,
+				method: details?.method || 'GET',
+				headers: details?.headers || {},
+				data: details?.data,
+				responseType: details?.responseType || 'text',
+				timeout: details?.timeout || 30000
+			} }));
+			return { abort: () => { try { __ocsBinding(JSON.stringify({ id, action: 'abort' })); } catch {} } };
+		};
+		__ocsDefineGlobal('GM_xmlhttpRequest', GM_xmlhttpRequest);
 	window.addEventListener(__ocsResponseEvent, (event) => {
 		const response = event.detail || {};
 		const request = __ocsRequests.get(String(response.id));
@@ -958,12 +1024,50 @@ function createOcsjsRuntimeSource(
 		}
 	});
 
-	try {
-		${body}
-	} catch (error) {
-		console.error('OCSJS 内嵌脚本执行失败', error);
-	}
-})();`;
+		const __ocsRunBody = () => {
+			try {
+				${body}
+			} catch (error) {
+				console.error('OCSJS 内嵌脚本执行失败', error);
+			}
+			const __ocsKeepAliveIds = ${keepAliveJson};
+			if (__ocsKeepAliveIds.length && document.documentElement) {
+				const __ocsKept = new Map();
+				const __ocsTrackKept = () => {
+					for (const id of __ocsKeepAliveIds) {
+						const element = document.getElementById(id);
+						if (element) __ocsKept.set(id, element);
+					}
+				};
+				__ocsTrackKept();
+				new MutationObserver(__ocsTrackKept).observe(document.documentElement, { childList: true, subtree: true });
+				setInterval(() => {
+					if (!document.body || !document.body.isConnected) return;
+					for (const element of __ocsKept.values()) {
+						if (!element.isConnected) {
+							try { document.body.appendChild(element); } catch (error) { console.error('OCS keep-alive failed', error); }
+						}
+					}
+				}, 1500);
+			}
+		};
+		const __ocsWaitComplete = (callback) => {
+			if (document.readyState === 'complete') { callback(); return; }
+			const handler = () => {
+				if (document.readyState !== 'complete') return;
+				document.removeEventListener('readystatechange', handler);
+				window.removeEventListener('load', handler);
+				callback();
+			};
+			document.addEventListener('readystatechange', handler);
+			window.addEventListener('load', handler);
+		};
+		if (${runAtJson} === 'document-end' && document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', () => __ocsRunBody(), { once: true });
+		} else {
+			__ocsRunBody();
+		}
+	})();`;
 }
 
 async function handleGmBinding(contents: WebContents, state: NetworkState, params: any) {
