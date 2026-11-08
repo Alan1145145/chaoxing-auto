@@ -157,4 +157,9 @@ model-request 架构、设置保留、浏览器修复等），而本地仓库此
 ## 五、发布
 
 - 版本 **1.0.6**（基于 GitHub v1.0.5 代码线，`package.json` 已同步）。
-- 安装包与校验文件见 `packages/app/dist-release-1.0.6/`（`SHA256SUMS.txt` / `latest.yml` / `安装使用说明.txt`）。
+- **2026-11-09 发布**：U校园 集成按用户要求先行移除（OCS 项目、自动化入口、页面、内置助手脚本、播种、平台目录与 NOTICE/README 条目；`doubao-injection`/`local-ai-server` 两个依赖助手脚本的夹具随之退役），重打包后作为 **GitHub Release [v1.0.6](https://github.com/Alan1145145/chaoxing-auto/releases/tag/v1.0.6)** 发布：
+  - 远程 main `d6740250` = `4e8a25f` + 本地增量（git 直连被重置，经 Git Data API 推送，树校验 0 差异）；
+  - 安装包 SHA-256 `0c8d2525…3fc644`（285,574,019 字节），GitHub 资产端 digest 校验一致；
+  - 资产：exe / blockmap / `latest.yml`（应用内更新）/ `SHA256SUMS.txt` / `install-notes.txt`
+    （GitHub 上传接口不支持非 ASCII 资产名，中文《安装使用说明》以 `install-notes.txt` 分发）；
+  - 移除后回归：学习强国 16/16、风控韧性 11/11、follow-provider / navigation-race 全过。
